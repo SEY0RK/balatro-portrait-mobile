@@ -1337,7 +1337,7 @@
  
 -    
 +    local SC_scale_splash = 13*SC_scale
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        SC_scale_splash = 10*SC_scale
 +    end
 +
@@ -1354,7 +1354,7 @@
      G.SPLASH_LOGO.dissolve = 1   
  
 +    local mult = 1.2
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        mult = 0.9
 +    end
  
@@ -1394,7 +1394,7 @@
  
 +    local align_version = "tri"
 +    local offset_version = 0
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        align_version = "tli"
 +        offset_version = 0.6
 +    end
@@ -1454,16 +1454,16 @@
      self.HUD = UIBox{
 -        definition = create_UIBox_HUD(),
 -        config = {align=('cli'), offset = {x=-0.7,y=0},major = G.ROOM_ATTACH}
-+        definition = (G.F_PORTRAIT and create_UIBox_HUD_vertical() or create_UIBox_HUD()), 
++        definition = (G.F_PORTRAIT_LAYOUT and create_UIBox_HUD_vertical() or create_UIBox_HUD()), 
 +        config = {
-+            align = (G.F_PORTRAIT and 'tm' or 'cli'), 
-+            offset = (G.F_PORTRAIT and {x=0, y=0} or {x=-0.7, y=0}), 
-+            major = (G.F_PORTRAIT and G.ROOM or G.ROOM_ATTACH)
++            align = (G.F_PORTRAIT_LAYOUT and 'tm' or 'cli'), 
++            offset = (G.F_PORTRAIT_LAYOUT and {x=0, y=0} or {x=-0.7, y=0}), 
++            major = (G.F_PORTRAIT_LAYOUT and G.ROOM or G.ROOM_ATTACH)
 +        }
      }
 +    
 +    -- Portrait: Force HUD to TOP of screen
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        self.HUD.T.y = 0.2  -- Little margin - HUD at top
 +        self.HUD.T.x = (G.ROOM.T.w - self.HUD.T.w) / 2
 +    end
@@ -1482,7 +1482,7 @@
 +    if _hb_d2 then _hb_d2.config.func = 'portrait_HUD_blind_debuff' end
      self.HUD_tags = {}
  
-+    if G.F_PORTRAIT and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
++    if G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
 +        if self.hand_preview then self.hand_preview:remove(); self.hand_preview = nil end
 +        self.hand_preview = UIBox{
 +            definition = create_UIBox_hand_preview(),
@@ -1500,7 +1500,7 @@
       
      self.HUD:recalculate()
 +    -- The shelves of the non-classic layouts start under the HUD just built.
-+    if G.F_PORTRAIT then set_screen_positions() end
++    if G.F_PORTRAIT_LAYOUT then set_screen_positions() end
  
      G.E_MANAGER:add_event(Event({
          trigger = 'immediate',
@@ -1883,7 +1883,7 @@
 +        --no cards are mid-animation and the shop UI hasn't been built yet, so
 +        --everything below picks up the new scale/layout. The next hand then
 +        --starts in the new mode without restarting the run.
-+        if G.F_PORTRAIT and G.F_SWIPE_ONLY ~= (not not G.SETTINGS.swipe_only_mode) then
++        if G.F_PORTRAIT_LAYOUT and G.F_SWIPE_ONLY ~= (not not G.SETTINGS.swipe_only_mode) then
 +            G.F_SWIPE_ONLY = not not G.SETTINGS.swipe_only_mode
 +            pcall(function() love.resize(love.graphics.getDimensions()) end)
 +            if G.HUD and G.ROOM then G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w)/2 end
@@ -1919,9 +1919,9 @@
                      config = {align="bmi", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
                  }
 -                G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
-+                G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - (G.F_PORTRAIT and PORTRAIT_CONFIG.jokers_y or G.jokers.T.y)) + G.blind_select.T.h
++                G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - (G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.jokers_y or G.jokers.T.y)) + G.blind_select.T.h
 +                -- Portrait: kept between the joker shelf and the screen's bottom.
-+                if G.F_PORTRAIT then G.blind_select.alignment.offset.y = portrait_blind_select_offset() end
++                if G.F_PORTRAIT_LAYOUT then G.blind_select.alignment.offset.y = portrait_blind_select_offset() end
                  G.ROOM.jiggle = G.ROOM.jiggle + 3
                  G.blind_select.alignment.offset.x = 0
                  G.CONTROLLER.lock_input = false
@@ -1929,14 +1929,14 @@
                  G.GAME.facing_blind = nil
                  save_run()
                  ease_background_colour_blind(G.STATES.ROUND_EVAL)
-+                local round_eval_align = G.F_PORTRAIT and "b" or "bm"
++                local round_eval_align = G.F_PORTRAIT_LAYOUT and "b" or "bm"
                  G.round_eval = UIBox{
                      definition = create_UIBox_round_evaluation(),
 -                    config = {align="bm", offset = {x=0,y=G.ROOM.T.y + 19},major = G.hand, bond = 'Weak'}
 +                    config = {align=round_eval_align, offset = {x=0,y=G.ROOM.T.y + 19},major = G.hand, bond = 'Weak'}
                  }
                  G.round_eval.alignment.offset.x = 0
-+                if G.F_PORTRAIT and G.ROOM and G.ROOM.T then
++                if G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T then
 +                    local x = (G.ROOM.T.w - G.round_eval.T.w)/2
 +                    if G.round_eval.role and G.round_eval.role.offset and G.round_eval.role.major then
 +                        local major = G.round_eval.role.major:get_major()
