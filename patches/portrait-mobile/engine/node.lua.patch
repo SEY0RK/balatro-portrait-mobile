@@ -27,7 +27,7 @@
              self.children.h_popup.states.drag.can = true
 +            -- Portrait: tooltips are not dragged (the line above stays vanilla:
 +            -- Steamodded hooks its infotip fix in after it).
-+            if G.F_PORTRAIT then self.children.h_popup.states.drag.can = false end
++            if G.F_PORTRAIT_LAYOUT then self.children.h_popup.states.drag.can = false end
 +            if prepare_portrait_popup_fit then
 +                prepare_portrait_popup_fit(self.children.h_popup)
 +            end
