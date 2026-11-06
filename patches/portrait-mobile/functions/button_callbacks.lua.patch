@@ -235,7 +235,7 @@
 +    end
 +  end
 +
-+  local row_sizes = G.F_PORTRAIT and PORTRAIT_CONFIG.row_sizes or PORTRAIT_CONFIG.row_sizes_landscape
++  local row_sizes = G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.row_sizes or PORTRAIT_CONFIG.row_sizes_landscape
 +  local page = args.cycle_config.current_option
 +  local card_index = 1 + (page - 1) * 11
 +
@@ -283,7 +283,7 @@
 +  G.SETTINGS.portrait_layout = args.to_key
 +  G:save_settings()
 +  if G.buttons then rebuild_buttons_uibox() end
-+  if G.F_PORTRAIT then
++  if G.F_PORTRAIT_LAYOUT then
 +    portrait_rebuild_HUD()
 +    pcall(set_screen_positions)
 +    portrait_reflow_panels()
@@ -325,7 +325,7 @@
 +  set_screen_positions()
 +
 +  -- 2. Update the LIVE alignment properties of the first tag
-+  if G.HUD_tags and G.HUD_tags[1] and G.F_PORTRAIT then
++  if G.HUD_tags and G.HUD_tags[1] and G.F_PORTRAIT_LAYOUT then
 +    -- Modify the actual active alignment type ('bl' or 'br')
 +    G.HUD_tags[1].alignment.type = (G.SETTINGS.play_main_hand == 1) and 'bl' or 'br'
 +    G.HUD_tags[1].alignment.offset.x = (G.SETTINGS.play_main_hand == 1) and -0.2  or 0.2
@@ -532,8 +532,8 @@
      --removes the UI from the previously selected back and adds the new one
  
 +    local mobile_ui = PORTRAIT_CONFIG and PORTRAIT_CONFIG.mobile_ui or {}
-+    local setup_back_desc_scale = G.F_PORTRAIT and (mobile_ui.run_setup_back_desc_scale or 0.72) or nil
-+    local setup_back_min_dims = G.F_PORTRAIT and (mobile_ui.run_setup_back_min_dims or 0.76) or nil
++    local setup_back_desc_scale = G.F_PORTRAIT_LAYOUT and (mobile_ui.run_setup_back_desc_scale or 0.72) or nil
++    local setup_back_min_dims = G.F_PORTRAIT_LAYOUT and (mobile_ui.run_setup_back_min_dims or 0.76) or nil
 +
      e.config.object:remove() 
 +    e.config.object = UIBox{
@@ -558,7 +558,7 @@
        config = {offset = {x=0,y=0}, parent = tab_contents, type = 'cm'}
      }
    tab_contents.UIBox:recalculate()
-+  if G.F_PORTRAIT and tab_contents.UIBox == G.OVERLAY_MENU then portrait_fit_overlay(G.OVERLAY_MENU) end
++  if G.F_PORTRAIT_LAYOUT and tab_contents.UIBox == G.OVERLAY_MENU then portrait_fit_overlay(G.OVERLAY_MENU) end
  end
  
  --||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -566,7 +566,7 @@
  
    --Set the offset and align. The menu overlay can be initially offset in the y direction and this will ensure it slides to middle
    G.OVERLAY_MENU.alignment.offset.y = 0
-+  if G.F_PORTRAIT then portrait_fit_overlay(G.OVERLAY_MENU) end
++  if G.F_PORTRAIT_LAYOUT then portrait_fit_overlay(G.OVERLAY_MENU) end
    G.ROOM.jiggle = G.ROOM.jiggle + 1
    G.OVERLAY_MENU:align_to_major()
 -
@@ -722,17 +722,17 @@
    elseif not e.config.object and G.run_setup_seed then
 +    -- Portrait: this row was built for a mouse. The field, the paste button and
 +    -- the note beside them were too small to hit or read on a phone (#44).
-+    local seed_note_scale = G.F_PORTRAIT and 0.34 or 0.26
-+    local seed_field_w = G.F_PORTRAIT and 3.1 or 2.5
-+    local seed_field_h = G.F_PORTRAIT and 1.0 or 0.7
-+    local seed_text_scale = G.F_PORTRAIT and 0.5 or 0.4
-+    local paste_w = G.F_PORTRAIT and 1.7 or 1
-+    local paste_h = G.F_PORTRAIT and 1.0 or 0.6
-+    local paste_scale = G.F_PORTRAIT and 0.4 or 0.3
++    local seed_note_scale = G.F_PORTRAIT_LAYOUT and 0.34 or 0.26
++    local seed_field_w = G.F_PORTRAIT_LAYOUT and 3.1 or 2.5
++    local seed_field_h = G.F_PORTRAIT_LAYOUT and 1.0 or 0.7
++    local seed_text_scale = G.F_PORTRAIT_LAYOUT and 0.5 or 0.4
++    local paste_w = G.F_PORTRAIT_LAYOUT and 1.7 or 1
++    local paste_h = G.F_PORTRAIT_LAYOUT and 1.0 or 0.6
++    local paste_scale = G.F_PORTRAIT_LAYOUT and 0.4 or 0.3
 +    -- The columns either side of the field are desktop breathing room; on a phone
 +    -- they push the row past the panel and cut the note off at the screen edge.
-+    local seed_note_w = G.F_PORTRAIT and 2.2 or 2.5
-+    local seed_tail_w = G.F_PORTRAIT and 0.2 or 2.5
++    local seed_note_w = G.F_PORTRAIT_LAYOUT and 2.2 or 2.5
++    local seed_tail_w = G.F_PORTRAIT_LAYOUT and 0.2 or 2.5
 +
      e.config.object = UIBox{
        definition = {n=G.UIT.ROOT, config={align = "cm", colour = G.C.CLEAR}, nodes={
@@ -846,11 +846,11 @@
 -    if not e.config.ref_table.run_info and G.blind_select and G.blind_select.VT.y < 10 and e.config.id and G.blind_select_opts[string.lower(e.config.id)] then 
 -      if e.UIBox.role.xy_bond ~= 'Weak' then e.UIBox:set_role({xy_bond = 'Weak'}) end
 +    -- Dynamic Y-limit to account for Portrait mode's lower UI placement
-+    local y_limit = G.F_PORTRAIT and 50 or 10
++    local y_limit = G.F_PORTRAIT_LAYOUT and 50 or 10
 +
 +    if not e.config.ref_table.run_info and G.blind_select and G.blind_select.VT.y < y_limit and e.config.id and G.blind_select_opts[string.lower(e.config.id)] then
 +      -- Portrait: skip xy_bond change to keep blind cards locked in row layout (prevents fly-away)
-+      if not G.F_PORTRAIT and e.UIBox.role.xy_bond ~= 'Weak' then e.UIBox:set_role({xy_bond = 'Weak'}) end
++      if not G.F_PORTRAIT_LAYOUT and e.UIBox.role.xy_bond ~= 'Weak' then e.UIBox:set_role({xy_bond = 'Weak'}) end
        if (e.config.ref_table.deck ~= 'on' and e.config.id == G.GAME.blind_on_deck) or
 -         (e.config.ref_table.deck ~= 'off' and e.config.id ~= G.GAME.blind_on_deck) then
 +        (e.config.ref_table.deck ~= 'off' and e.config.id ~= G.GAME.blind_on_deck) then
@@ -864,8 +864,8 @@
 -            _blind_choice.alignment.offset.y = -0.9
 +            
 +            -- Elevates the active blind visually (portrait: no y-shift to prevent row drift)
-+            local y_offset_active = G.F_PORTRAIT and 0 or -0.9
-+            if not G.F_PORTRAIT then _blind_choice.alignment.offset.y = y_offset_active end
++            local y_offset_active = G.F_PORTRAIT_LAYOUT and 0 or -0.9
++            if not G.F_PORTRAIT_LAYOUT then _blind_choice.alignment.offset.y = y_offset_active end
 +            
              if _tag and _tag_container then 
                _tag_container.children[2].config.draw_after = false
@@ -877,7 +877,7 @@
 -            _blind_choice.alignment.offset.y = -0.2
 +            
 +            -- Pushes inactive blinds down visually (portrait: no y-shift to prevent row drift)
-+            local y_offset_inactive = G.F_PORTRAIT and 0 or -0.2
++            local y_offset_inactive = G.F_PORTRAIT_LAYOUT and 0 or -0.2
 +            _blind_choice.alignment.offset.y = y_offset_inactive
 +            
              if _tag and _tag_container then 
@@ -906,7 +906,7 @@
        not e.parent.children.alert then
          local _sprite = e.config.ref_table:get_uibox_table()
 +        local popup_align = 'tm'
-+        local popup_offset = {x = 0, y = G.F_PORTRAIT and -0.45 or -0.1}
++        local popup_offset = {x = 0, y = G.F_PORTRAIT_LAYOUT and -0.45 or -0.1}
          e.parent.children.alert = UIBox{
            definition = G.UIDEF.card_h_popup(_sprite),
 -          config = {align="tm", offset = {x = 0, y = -0.1},
@@ -929,7 +929,7 @@
 -          G.blind_select_opts.boss:set_role({xy_bond = 'Weak'})
 -          G.blind_select_opts.boss.alignment.offset.y = 20
 +          -- Portrait: skip slide-out animation to prevent layout drift
-+          if not G.F_PORTRAIT then
++          if not G.F_PORTRAIT_LAYOUT then
 +            G.blind_select_opts.boss:set_role({xy_bond = 'Weak'})
 +            G.blind_select_opts.boss.alignment.offset.y = 20
 +          end
@@ -939,7 +939,7 @@
      G.E_MANAGER:add_event(Event({
        trigger = 'after',
 -      delay = 0.3,
-+      delay = G.F_PORTRAIT and 0.05 or 0.3,
++      delay = G.F_PORTRAIT_LAYOUT and 0.05 or 0.3,
        func = (function()
          local par = G.blind_select_opts.boss.parent
          G.GAME.round_resets.blind_choices.Boss = get_new_boss()
@@ -967,9 +967,9 @@
            definition =
              {n=G.UIT.ROOT, config={align = "cm", colour = G.C.CLEAR}, nodes={
 -              UIBox_dyn_container({create_UIBox_blind_choice('Boss')},false,get_blind_main_colour('Boss'), mix_colours(G.C.BLACK, get_blind_main_colour('Boss'), 0.8))
-+              {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT and (mobile_blind.wrapper_pad or 0.012) or 0.03, colour = G.C.UI.TRANSPARENT_DARK, r=0.1}, nodes={
-+                {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04, colour = boss_main_colour, r=0.1}, nodes={
-+                  {n=G.UIT.R, config = {align = "tm", colour = boss_bg_colour, r=0.1, padding = G.F_PORTRAIT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04}, nodes={
++              {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT_LAYOUT and (mobile_blind.wrapper_pad or 0.012) or 0.03, colour = G.C.UI.TRANSPARENT_DARK, r=0.1}, nodes={
++                {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT_LAYOUT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04, colour = boss_main_colour, r=0.1}, nodes={
++                  {n=G.UIT.R, config = {align = "tm", colour = boss_bg_colour, r=0.1, padding = G.F_PORTRAIT_LAYOUT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04}, nodes={
 +                    create_UIBox_blind_choice('Boss')
 +                  }}
 +                }}
@@ -977,17 +977,17 @@
              }},
            config = {align="bmi",
 -                    offset = {x=0,y=G.ROOM.T.y + 9},
-+                    offset = {x=0,y=G.F_PORTRAIT and 0 or (G.ROOM.T.y + 9)},
++                    offset = {x=0,y=G.F_PORTRAIT_LAYOUT and 0 or (G.ROOM.T.y + 9)},
                      major = par,
 -                    xy_bond = 'Weak'
-+                    xy_bond = G.F_PORTRAIT and 'Strong' or 'Weak'
++                    xy_bond = G.F_PORTRAIT_LAYOUT and 'Strong' or 'Weak'
                    }
          }
          par.config.object = G.blind_select_opts.boss
          par.config.object:recalculate()
          G.blind_select_opts.boss.parent = par
          G.blind_select_opts.boss.alignment.offset.y = 0
-+        if G.F_PORTRAIT then
++        if G.F_PORTRAIT_LAYOUT then
 +            -- Force-snap to the row slot so it doesn't render at its initial T.
 +            G.blind_select_opts.boss:align_to_major()
 +            G.blind_select_opts.boss:hard_set_VT()
