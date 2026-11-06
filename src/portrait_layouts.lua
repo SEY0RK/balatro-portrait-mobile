@@ -891,9 +891,11 @@ end
 --once. Boxes anchored to the old HUD (blind prompt, shop sign) are moved to
 --the new one.
 function portrait_rebuild_HUD()
-  if not (G.F_PORTRAIT and G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind and G.GAME and G.GAME.blind) then return end
+  if not (G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind and G.GAME and G.GAME.blind) then return end
+  local is_portrait = not not G.F_PORTRAIT
+  local had_hand_preview = G.hand_preview ~= nil
 
-  --The blind sprite lives in the panel; removing the panel would remove it.
+  -- Keep the active Blind object alive while replacing the HUD in either direction.
   local function detach(node)
     if node.config and node.config.object == G.GAME.blind then node.config.object = nil end
     for _, child in pairs(node.children or {}) do detach(child) end
@@ -907,22 +909,35 @@ function portrait_rebuild_HUD()
   G.HUD:remove()
   G.HUD_blind:remove()
   portrait_remove_dock()
+  if G.hand_preview then G.hand_preview:remove(); G.hand_preview = nil end
 
+  local row_align = is_portrait and 'tm' or 'cli'
+  local row_offset = is_portrait and {x = 0, y = 0} or {x = -0.7, y = 0}
+  local row_major = is_portrait and G.ROOM or G.ROOM_ATTACH
   G.HUD = UIBox{
-    definition = create_UIBox_HUD_vertical(),
-    config = {align = 'tm', offset = {x = 0, y = 0}, major = G.ROOM}
+    definition = is_portrait and create_UIBox_HUD_vertical() or create_UIBox_HUD(),
+    config = {align = row_align, offset = row_offset, major = row_major}
   }
-  G.HUD.T.y = 0.2
-  G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
+  if is_portrait then
+    G.HUD.T.y = 0.2
+    G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
+  end
 
   local row_blind = G.HUD:get_UIE_by_ID('row_blind')
   G.HUD_blind = UIBox{
     definition = create_UIBox_HUD_blind(),
-    config = {major = G.HUD:get_UIE_by_ID(major_id) or row_blind, align = 'cm', offset = {x = 0, y = blind_offset_y}, bond = 'Weak'}
+    config = {
+      major = G.HUD:get_UIE_by_ID(major_id) or row_blind,
+      align = 'cm',
+      offset = {x = 0, y = is_portrait and blind_offset_y or -10},
+      bond = 'Weak'
+    }
   }
-  for _, id in ipairs({'HUD_blind_debuff_1', 'HUD_blind_debuff_2'}) do
-    local node = G.HUD_blind:get_UIE_by_ID(id)
-    if node then node.config.func = 'portrait_HUD_blind_debuff' end
+  if is_portrait then
+    for _, id in ipairs({'HUD_blind_debuff_1', 'HUD_blind_debuff_2'}) do
+      local node = G.HUD_blind:get_UIE_by_ID(id)
+      if node then node.config.func = 'portrait_HUD_blind_debuff' end
+    end
   end
 
   G.hand_text_area = {
@@ -941,8 +956,7 @@ function portrait_rebuild_HUD()
   G.HUD:recalculate()
   G.HUD_blind:recalculate()
 
-  if G.hand_preview then
-    G.hand_preview:remove()
+  if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
     G.hand_preview = UIBox{
       definition = create_UIBox_hand_preview(),
       config = {align = 'tm', offset = {x = 0, y = PORTRAIT_CONFIG.hand_preview.y_offset or -0.65}, major = G.hand, bond = 'Weak'}
@@ -951,8 +965,7 @@ function portrait_rebuild_HUD()
     G.hand_preview.states.visible = false
   end
 
-  --Boxes draw in the order they were made, so these go back on top of the
-  --new HUD as well.
+  -- Boxes anchored to the old blind row must follow the replacement row.
   for _, box in ipairs({G.blind_prompt_box, G.SHOP_SIGN}) do
     if box and not box.REMOVED and row_blind then
       box:set_alignment({major = row_blind})
@@ -963,7 +976,6 @@ function portrait_rebuild_HUD()
     end
   end
 end
-
 --Where Classic's joker shelf sits: its tuned jokers_y on phones. On a short
 --room (tablets, 16:10) that left the shop no room under the shelf and pushed
 --its bottom row off screen, so there the shelves start under the HUD.
