@@ -58,7 +58,7 @@
 +function portrait_lift_for_keyboard()
 +  local box = G and G.OVERLAY_MENU
 +  local hook = G and G.CONTROLLER and G.CONTROLLER.text_input_hook
-+  if not (box and hook and hook.T and G.ROOM and G.ROOM.T and G.F_PORTRAIT) then return end
++  if not (box and hook and hook.T and G.ROOM and G.ROOM.T and G.F_PORTRAIT_LAYOUT) then return end
 +  if box.portrait_keyboard_lift then return end
 +
 +  local lift = hook.T.y - (G.ROOM.T.h or 20)*keyboard_lift_target
