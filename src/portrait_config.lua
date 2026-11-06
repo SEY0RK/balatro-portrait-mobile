@@ -986,7 +986,8 @@ PORTRAIT_FPS_NAMES = {'Screen', '60', '30'}
 PORTRAIT_FPS_CAPS = {false, 60, 30}
 
 function portrait_layout()
-    local i = G and G.SETTINGS and G.SETTINGS.portrait_layout or 1
+    if not (G and G.F_PORTRAIT_LAYOUT) then return 'classic' end
+    local i = G.SETTINGS and G.SETTINGS.portrait_layout or 1
     return PORTRAIT_LAYOUTS[i] or 'classic'
 end
 
