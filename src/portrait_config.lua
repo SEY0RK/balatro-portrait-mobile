@@ -980,6 +980,10 @@ end
 PORTRAIT_LAYOUTS = {'classic', 'one_thumb', 'focus'}
 PORTRAIT_LAYOUT_NAMES = {'Classic', 'One-Thumb', 'Focus'}
 
+-- The app remains physically portrait; this selects the game's internal layout.
+PORTRAIT_DISPLAY_MODES = {'Portrait', 'Original Landscape'}
+PORTRAIT_DISPLAY_MODE_KEYS = {portrait = 1, landscape = 2}
+
 -- Options > Graphics. The first follows fps_cap above; a lower cap is what saves
 -- battery, since every frame runs the background and CRT shaders over the screen.
 PORTRAIT_FPS_NAMES = {'Screen', '60', '30'}
