@@ -892,7 +892,7 @@ end
 --the new one.
 function portrait_rebuild_HUD()
   if not (G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind and G.GAME and G.GAME.blind) then return end
-  local is_portrait = not not G.F_PORTRAIT
+  local is_portrait = not not G.F_PORTRAIT_LAYOUT
   local had_hand_preview = G.hand_preview ~= nil
 
   -- Keep the active Blind object alive while replacing the HUD in either direction.
@@ -991,7 +991,7 @@ end
 --whose hand sits higher or lower than Classic's moves them by the
 --difference, so they keep Classic's place at the bottom of the screen.
 function portrait_panel_drop()
-  if not G.F_PORTRAIT then return 0 end
+  if not G.F_PORTRAIT_LAYOUT then return 0 end
   local grown = G.hand and G.hand.portrait_base_h and (G.hand.T.h - G.hand.portrait_base_h) or 0
   return get_hand_base_offset() - PORTRAIT_CONFIG.hand_base_offset + grown
 end
@@ -1041,7 +1041,7 @@ end
 --back where their builders would have. set_screen_positions leaves the hand
 --short of its rest, and a panel placed from there ended 0.35 too low.
 function portrait_reflow_panels()
-  if not G.F_PORTRAIT or not G.hand then return end
+  if not G.F_PORTRAIT_LAYOUT or not G.hand then return end
   G.hand.T.y = portrait_hand_rest_y()
   if G.shop and not G.shop.REMOVED and G.STATE == G.STATES.SHOP then
     G.shop.alignment.offset.y = portrait_shop_offset()
@@ -1056,7 +1056,7 @@ end
 --the first tag instead, so no tag ever sits on the HUD. Re-run whenever a tag
 --comes or goes and when the shelves move.
 function portrait_arrange_tags()
-  if not (G.F_PORTRAIT and G.HUD_tags and G.HUD_tags[1] and G.jokers and G.jokers.T) then return end
+  if not (G.F_PORTRAIT_LAYOUT and G.HUD_tags and G.HUD_tags[1] and G.jokers and G.jokers.T) then return end
   local align, offset = get_portrait_first_tag_align()
   local tag_h = G.HUD_tags[1].T.h > 0 and G.HUD_tags[1].T.h or 0.9
   local first_top = G.jokers.T.y + G.jokers.T.h
@@ -1078,7 +1078,7 @@ end
 --whose label line has to stay exactly as vanilla wrote it (another mod's
 --Lovely patch anchors on that line).
 G.FUNCS.portrait_text_scale = function(e)
-  if e.config.text_scaled or not G.F_PORTRAIT then return end
+  if e.config.text_scaled or not G.F_PORTRAIT_LAYOUT then return end
   for _, child in ipairs(e.children) do
     if child.UIT == G.UIT.T and child.config then child.config.scale = e.config.text_scale end
   end
@@ -1154,11 +1154,11 @@ local portrait_game_update = Game.update
 function Game:update(dt)
   portrait_game_update(self, dt)
   local ot = G.OVERLAY_TUTORIAL
-  if G.F_PORTRAIT and ot and not ot.REMOVED then
+  if G.F_PORTRAIT_LAYOUT and ot and not ot.REMOVED then
     stack_tutorial(ot)
     lift_tutorial(ot)
   end
-  if G.F_PORTRAIT and ot and not ot.REMOVED and not ot.portrait_covered and ot.UIRoot and G.ROOM and G.ROOM.T then
+  if G.F_PORTRAIT_LAYOUT and ot and not ot.REMOVED and not ot.portrait_covered and ot.UIRoot and G.ROOM and G.ROOM.T then
     ot.portrait_covered = true
     local need_h = G.ROOM.T.h + 2 * (math.abs(ot.alignment and ot.alignment.offset and ot.alignment.offset.y or 0) + 2)
     if ot.T.h < need_h then
@@ -1192,7 +1192,7 @@ local function wrap_smods_badge()
       return
     end
     local badge = e.children[1]
-    if G.F_PORTRAIT and badge and badge ~= had and e.UIBox and e.UIBox.T then
+    if G.F_PORTRAIT_LAYOUT and badge and badge ~= had and e.UIBox and e.UIBox.T then
       local max_w = e.UIBox.T.w - 0.2
       local function clamp(node)
         if node.config and node.config.minw and node.config.minw > max_w then node.config.minw = max_w end
@@ -1209,6 +1209,6 @@ portrait_wrap_smods_badge = wrap_smods_badge
 
 local game_ease_value = ease_value
 function ease_value(ref_table, ...)
-  if G.F_PORTRAIT and G.HUD and G.HUD.alignment and ref_table == G.HUD.alignment.offset then return end
+  if G.F_PORTRAIT_LAYOUT and G.HUD and G.HUD.alignment and ref_table == G.HUD.alignment.offset then return end
   return game_ease_value(ref_table, ...)
 end
