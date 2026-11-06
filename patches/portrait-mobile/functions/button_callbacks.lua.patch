@@ -279,6 +279,21 @@
 +--Portrait layout style (Classic / One-Thumb / Focus, see portrait_layout).
 +--Applied on the spot: the HUD, blind panel, button bar and card areas are
 +--rebuilt in the new style (portrait_rebuild_HUD), mid-run too.
++G.FUNCS.change_portrait_display_mode = function(args)
++  G.SETTINGS.portrait_display_mode = args.to_key
++  G:save_settings()
++  local w, h = love.graphics.getDimensions()
++  love.resize(w, h)
++  if G.STAGE == G.STAGES.RUN then
++    portrait_rebuild_HUD()
++    if G.buttons then rebuild_buttons_uibox() end
++    if G.F_PORTRAIT_LAYOUT then
++      pcall(set_screen_positions)
++      portrait_reflow_panels()
++    end
++  end
++end
++
 +G.FUNCS.change_portrait_layout = function(args)
 +  G.SETTINGS.portrait_layout = args.to_key
 +  G:save_settings()
