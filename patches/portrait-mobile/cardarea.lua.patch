@@ -52,10 +52,10 @@
 -        G.hand.T.y = 15*G.real_dt*desired_y + (1-15*G.real_dt)*G.hand.T.y
 +        -- Early exit if hand is not properly initialized
 +        if not G.hand or not G.hand.T then return end
-+        if G.F_PORTRAIT then portrait_set_hand_height() end
++        if G.F_PORTRAIT_LAYOUT then portrait_set_hand_height() end
 +        
 +        local desired_y
-+        if G.F_PORTRAIT then
++        if G.F_PORTRAIT_LAYOUT then
 +            desired_y = portrait_hand_rest_y()
 +        else
 +            -- Landscape mode: Original behavior
@@ -77,7 +77,7 @@
 +    -- dragged vertically, lift the rest of the selection with it so the whole
 +    -- hand visibly moves together before the flick plays/discards it.
 +    -- Horizontal drags are ignored, so drag-to-reorder is unaffected.
-+    if self == G.hand and G.F_PORTRAIT and G.STATE == G.STATES.SELECTING_HAND
++    if self == G.hand and G.F_PORTRAIT_LAYOUT and G.STATE == G.STATES.SELECTING_HAND
 +        and PORTRAIT_CONFIG.gestures
 +        and (PORTRAIT_CONFIG.gestures.enabled or G.F_SWIPE_ONLY)
 +        and (PORTRAIT_CONFIG.gestures.group_follow ~= false) then
@@ -110,7 +110,7 @@
      else
 -        if not self.children.area_uibox then 
 +        if not self.children.area_uibox then
-+                local count_scale = G.F_PORTRAIT and 0.42 or 0.3
++                local count_scale = G.F_PORTRAIT_LAYOUT and 0.42 or 0.3
 +                -- Steamodded counts slots itself (negatives, extra slots) and
 +                -- shows card_limits.display_slots (total_slots before 26.x,
 +                -- which showed "52/nil" here); its patch for this line looks
@@ -139,7 +139,7 @@
  
 +    -- Portrait: outline the empty joker/consumable slots so the shelf reads as
 +    -- reserved capacity instead of dead felt (drawn under the cards).
-+    if G.F_PORTRAIT and PORTRAIT_CONFIG.joker_slots and PORTRAIT_CONFIG.joker_slots.enabled
++    if G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.joker_slots and PORTRAIT_CONFIG.joker_slots.enabled
 +        and (self == G.jokers or self == G.consumeables)
 +        and self.config.card_limit and self.config.card_limit > 0
 +        and #self.cards < self.config.card_limit then
@@ -191,7 +191,7 @@
  
  function CardArea:align_cards()
      if (self == G.hand or self == G.deck or self == G.discard or self == G.play) and G.view_deck and G.view_deck[1] and G.view_deck[1].cards then return end
-+    if self == G.hand and G.F_PORTRAIT then
++    if self == G.hand and G.F_PORTRAIT_LAYOUT then
 +        local k = portrait_hand_scale()
 +        for _, card in ipairs(self.cards) do
 +            if k ~= 1 or card.portrait_grown then
@@ -209,7 +209,7 @@
      end
 +
 +    local usable_w = self.T.w
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        local pc = PORTRAIT_CONFIG or {}
 +        usable_w = usable_w * (pc.usable_w_factor or 0.96)
 +        if self.config.type == 'hand' and G.ROOM and G.ROOM.T then
@@ -232,7 +232,7 @@
 +                -- Portrait booster: lift the hand row a little higher than the
 +                -- desktop default so a selected pack card (which rises to reveal
 +                -- its USE button) clears the hand instead of tucking under it.
-+                local pack_hand_lift = (G.F_PORTRAIT and PORTRAIT_CONFIG and PORTRAIT_CONFIG.pack_hand_lift) or 1.8
++                local pack_hand_lift = (G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG and PORTRAIT_CONFIG.pack_hand_lift) or 1.8
 +                card.T.y = G.hand.T.y - pack_hand_lift*card.T.h - highlight_height + (G.SETTINGS.reduced_motion and 0 or 1)*0.1*math.sin(0.666*G.TIMERS.REAL+card.T.x) + math.abs(1.3*(-#self.cards/2 + k-0.5)/(#self.cards))^2-0.3
                  card.T.x = card.T.x + card.shadow_parrallax.x/30
              end
@@ -253,7 +253,7 @@
 -                if not card.highlighted then highlight_height = 0 end
 +                if not card.highlighted then
 +                    highlight_height = 0
-+                elseif G.F_PORTRAIT and self.config.type == 'shop' then
++                elseif G.F_PORTRAIT_LAYOUT and self.config.type == 'shop' then
 +                    -- Lift a focused shop card up so its Buy/Open button (anchored
 +                    -- just below it) is revealed clear of the shop panel.
 +                    highlight_height = card.T.h * ((PORTRAIT_CONFIG and PORTRAIT_CONFIG.shop_highlight_lift) or 0.45)
@@ -270,7 +270,7 @@
                  local max_cards = math.max(#self.cards, self.config.temp_limit)
                  card.T.x = self.T.x + (self.T.w-self.card_w)*((k-1)/math.max(max_cards-1, 1) - 0.5*(#self.cards-max_cards)/math.max(max_cards-1, 1)) + 0.5*(self.card_w - card.T.w)
 -                if #self.cards > 2 or (#self.cards > 1 and self == G.consumeables) or (#self.cards > 1 and self.config.spread) then
-+                if G.F_PORTRAIT and (self == G.jokers or self == G.consumeables)
++                if G.F_PORTRAIT_LAYOUT and (self == G.jokers or self == G.consumeables)
 +                    and self.config.card_limit and self.config.card_limit > 1
 +                    and #self.cards < self.config.card_limit then
 +                    -- Portrait: keep each card in its fixed slot (slot k of
@@ -295,7 +295,7 @@
 -                if not card.highlighted then highlight_height = 0 end
 +                if not card.highlighted then
 +                    highlight_height = 0
-+                elseif G.F_PORTRAIT and self == G.pack_cards then
++                elseif G.F_PORTRAIT_LAYOUT and self == G.pack_cards then
 +                    -- Lift the selected pack card up into the gap above the row so
 +                    -- its USE button has clear space to appear beneath it (reveal),
 +                    -- instead of overlapping the art or colliding with the panel.
