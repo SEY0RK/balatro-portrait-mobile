@@ -287,10 +287,8 @@
 +  if G.STAGE == G.STAGES.RUN then
 +    portrait_rebuild_HUD()
 +    if G.buttons then rebuild_buttons_uibox() end
-+    if G.F_PORTRAIT_LAYOUT then
-+      pcall(set_screen_positions)
-+      portrait_reflow_panels()
-+    end
++    pcall(set_screen_positions)
++    if G.F_PORTRAIT_LAYOUT then portrait_reflow_panels() end
 +  end
 +end
 +
