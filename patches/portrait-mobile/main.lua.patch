@@ -668,7 +668,7 @@
 +    -- Swipe Only mode has no Play/Discard buttons, so gestures stay on there
 +    -- regardless of the gestures.enabled config.
 +    local gestures_on = gz and (gz.enabled or G.F_SWIPE_ONLY)
-+    if not (gestures_on and G.F_PORTRAIT) then return end
++    if not (gestures_on and G.F_PORTRAIT_LAYOUT) then return end
 +    local gs = G.CONTROLLER and G.CONTROLLER.gesture_start
 +    if G.CONTROLLER then G.CONTROLLER.gesture_start = nil end
 +    if not gs then return end
