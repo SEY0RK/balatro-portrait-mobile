@@ -1822,7 +1822,7 @@
          G.SHADERS['CRT']:send('crt_intensity', 0.16*G.SETTINGS.GRAPHICS.crt/100)
          G.SHADERS['CRT']:send('glitch_intensity', 0)--0.1*G.SETTINGS.GRAPHICS.crt/100 + (G.screenwipe_amt) + 1)
          G.SHADERS['CRT']:send('scanlines', G.CANVAS:getPixelHeight()*0.75/G.CANV_SCALE)
-@@ -3305,7 +3059,7 @@
+@@ -3305,7 +3059,11 @@
          love.graphics.setShader( G.SHADERS['CRT'])
          G.SETTINGS.GRAPHICS.crt = G.SETTINGS.GRAPHICS.crt/0.3
      end
@@ -1835,7 +1835,7 @@
          love.graphics.draw(self.CANVAS, 0, 0)
      love.graphics.pop()
  
-@@ -3321,20 +3075,12 @@
+@@ -3321,20 +3079,12 @@
  
      timer_checkpoint('canvas', 'draw')
  
@@ -1857,7 +1857,7 @@
          if G.check and G.SETTINGS.perf_mode then
              local section_h = 30
              local resolution = 60*section_h
-@@ -3370,7 +3116,7 @@
+@@ -3370,7 +3120,7 @@
  
  function Game:update_selecting_hand(dt)
      if not self.deck_preview and not G.OVERLAY_MENU and (
@@ -1866,7 +1866,7 @@
          G.CONTROLLER.held_buttons.triggerleft) then
          if self.buttons then
              self.buttons.states.visible = false
-@@ -3405,10 +3151,7 @@
+@@ -3405,10 +3155,7 @@
          }))
      end
      if not self.buttons and not self.deck_preview then
@@ -1878,7 +1878,7 @@
      end
      if self.buttons and not self.buttons.states.visible and not self.deck_preview then
          self.buttons.states.visible = true
-@@ -3433,6 +3176,18 @@
+@@ -3433,6 +3180,18 @@
  function Game:update_shop(dt)
      if not G.STATE_COMPLETE then
          stop_use()
@@ -1897,7 +1897,7 @@
          ease_background_colour_blind(G.STATES.SHOP)
          local shop_exists = not not G.shop
          G.shop = G.shop or UIBox{
-@@ -3441,7 +3196,8 @@
+@@ -3441,7 +3200,8 @@
          }
              G.E_MANAGER:add_event(Event({
                  func = function()
@@ -1907,7 +1907,7 @@
                      G.shop.alignment.offset.x = 0
                      G.E_MANAGER:add_event(Event({
                          trigger = 'after',
-@@ -3473,9 +3229,7 @@
+@@ -3473,9 +3233,7 @@
                                              G.shop_jokers:emplace(create_card_for_shop(G.shop_jokers))
                                          end
                                      end
@@ -1918,7 +1918,7 @@
                                      if G.load_shop_vouchers then 
                                          nosave_shop = true
                                          G.shop_vouchers:load(G.load_shop_vouchers)
-@@ -3646,7 +3400,9 @@
+@@ -3646,7 +3404,9 @@
                      definition = create_UIBox_blind_select(),
                      config = {align="bmi", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
                  }
@@ -1929,7 +1929,7 @@
                  G.ROOM.jiggle = G.ROOM.jiggle + 3
                  G.blind_select.alignment.offset.x = 0
                  G.CONTROLLER.lock_input = false
-@@ -3675,16 +3431,35 @@
+@@ -3675,16 +3435,35 @@
                  G.GAME.facing_blind = nil
                  save_run()
                  ease_background_colour_blind(G.STATES.ROUND_EVAL)
@@ -1968,7 +1968,7 @@
                          else
                              if math.abs(G.round_eval.T.y - G.round_eval.VT.y) < 3 then
                                      G.ROOM.jiggle = G.ROOM.jiggle + 3
-@@ -3990,23 +3765,3 @@
+@@ -3990,23 +3769,3 @@
  
  function Game:update_menu(dt)
  end
