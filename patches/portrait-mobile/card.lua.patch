@@ -100,7 +100,7 @@
 +                    (self.ability.set == 'Voucher' and 0.0) or
 +                    -0.05
 +
-+        if G.F_PORTRAIT then
++        if G.F_PORTRAIT_LAYOUT then
 +            local room_w = G.ROOM and G.ROOM.T and G.ROOM.T.w or 20
 +            local room_h = G.ROOM and G.ROOM.T and G.ROOM.T.h or 20
 +            local card_cx = self.T.x + self.T.w / 2
@@ -140,10 +140,10 @@
              xy_bond = 'Strong',
              r_bond = 'Weak',
              wh_bond = 'Weak',
-+            fit_to_room = G.F_PORTRAIT and true or nil,
++            fit_to_room = G.F_PORTRAIT_LAYOUT and true or nil,
 +            lr_clamp = nil,
-+            can_drag = G.F_PORTRAIT and false or nil,
-+            snap_to_fit = G.F_PORTRAIT and true or nil,
++            can_drag = G.F_PORTRAIT_LAYOUT and false or nil,
++            snap_to_fit = G.F_PORTRAIT_LAYOUT and true or nil,
              offset = {
 -                x = popup_direction ~= 'cl' and 0 or
 -                    focused_ui and -0.05 or
@@ -216,9 +216,9 @@
              end
          end
 -        if self.children.use_button and self.highlighted then self.children.use_button:draw() end
-+        local portrait_tray_use = G.F_PORTRAIT and ((self.area == G.jokers) or (self.area == G.consumeables))
++        local portrait_tray_use = G.F_PORTRAIT_LAYOUT and ((self.area == G.jokers) or (self.area == G.consumeables))
 +        if self.children.use_button and self.highlighted
-+            and not (G.F_PORTRAIT and self.ability.consumeable and self.area == G.pack_cards)
++            and not (G.F_PORTRAIT_LAYOUT and self.ability.consumeable and self.area == G.pack_cards)
 +            and not portrait_tray_use then
 +            self.children.use_button:draw()
 +        end
@@ -246,7 +246,7 @@
 +        -- Portrait pack/tray buttons can overlap the selected card, so draw them
 +        -- after the front sprite instead of letting the card cover the button.
 +        if self.children.use_button and self.highlighted
-+            and (G.F_PORTRAIT and self.ability.consumeable and self.area == G.pack_cards
++            and (G.F_PORTRAIT_LAYOUT and self.ability.consumeable and self.area == G.pack_cards
 +                or portrait_tray_use) then
 +            self.children.use_button:draw()
 +        end
@@ -262,14 +262,14 @@
 +            -- revealed beneath the card when it lifts on highlight (see the
 +            -- pack_highlight_lift in CardArea:align_cards). Placed 'bm' (below)
 +            -- so it never covers the art or collides with the pack panel.
-+            local pack_use = G.F_PORTRAIT and self.ability.consumeable and self.area == G.pack_cards
++            local pack_use = G.F_PORTRAIT_LAYOUT and self.ability.consumeable and self.area == G.pack_cards
 +            -- align_buttons: Steamodded's flag for card areas whose buttons go
 +            -- to the side like the jokers' (mods add such areas); its patch
 +            -- targets the vanilla lines this replaces.
 +            local is_tray = (self.area == G.jokers) or (self.area == G.consumeables) or (self.area.config.align_buttons and true or false)
 +            local tray_off = {x = x_off - 0.4, y = 0}
 +            local tray_align = 'cr'
-+            if is_tray and G.F_PORTRAIT and G.ROOM and G.ROOM.T and self.T then
++            if is_tray and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and self.T then
 +                local button_mult = (PORTRAIT_CONFIG.mobile_ui and PORTRAIT_CONFIG.mobile_ui.card_button_mult) or 1.4
 +                local tray_w = 1.25*(button_mult*0.78) + 0.3
 +                local room_right = G.ROOM.T.w - 0.12
