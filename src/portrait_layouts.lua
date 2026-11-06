@@ -956,6 +956,26 @@ function portrait_rebuild_HUD()
   G.HUD:recalculate()
   G.HUD_blind:recalculate()
 
+  if not is_portrait then
+    -- Restore the vanilla panel offsets when leaving portrait mode; these
+    -- boxes may have been moved while the portrait layout was active.
+    if G.shop and not G.shop.REMOVED and G.shop.alignment then
+      G.shop.alignment.offset.y = -5.3
+    end
+    if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.hand and G.jokers then
+      G.blind_select.alignment.offset.y = 0.8 - (G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
+    end
+    if G.round_eval and not G.round_eval.REMOVED and G.round_eval.alignment then
+      G.round_eval.alignment.offset.y = -7.8
+    end
+    if G.HUD_tags and G.HUD_tags[1] then
+      G.HUD_tags[1]:set_alignment({
+        type = 'bri', offset = {x = 0.7, y = 0},
+        xy_bond = 'Weak', major = G.ROOM_ATTACH
+      })
+    end
+  end
+
   if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
     G.hand_preview = UIBox{
       definition = create_UIBox_hand_preview(),
