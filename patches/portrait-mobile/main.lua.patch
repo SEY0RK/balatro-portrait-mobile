@@ -46,6 +46,12 @@
 +    end
 +    return tx, ty, tdx, tdy
 +end
++
++local function _transform_rotated_input(x, y, dx, dy)
++    if not (G and G.F_ROTATED_LANDSCAPE) then return x, y, dx, dy end
++    local screen_w = G.PORTRAIT_SCREEN_W or love.graphics.getWidth()
++    return y, screen_w - x, dy, -dx
++end
  require "engine/object"
  require "bit"
  require "engine/string_packer"
@@ -251,6 +257,10 @@
 -		splashVideo = love.graphics.newVideo("resources/videos/"..getSplashVideoFileName())
 -	end
 +	_force_android_portrait_hints()
++
++	G.F_ROTATED_LANDSCAPE = (os_name == 'Android' or os_name == 'iOS')
++		and G.SETTINGS and G.SETTINGS.portrait_display_mode == 2 or false
++	G.F_PORTRAIT_LAYOUT = not G.F_ROTATED_LANDSCAPE and not not G.F_PORTRAIT
  
 -	if splashVideo then
 -		shouldSplash = true
@@ -527,7 +537,9 @@
 +        local screen_h = love.graphics.getHeight()
 +        local canvas_w = G.CANVAS:getWidth() / (G.CANV_SCALE or 1)
 +        local canvas_h = G.CANVAS:getHeight() / (G.CANV_SCALE or 1)
-+        if math.abs(screen_w - canvas_w) > 2 or math.abs(screen_h - canvas_h) > 2 then
++        local expected_w = G.F_ROTATED_LANDSCAPE and screen_h or screen_w
++        local expected_h = G.F_ROTATED_LANDSCAPE and screen_w or screen_h
++        if math.abs(expected_w - canvas_w) > 2 or math.abs(expected_h - canvas_h) > 2 then
 +            love.resize(screen_w, screen_h)
 +        end
 +    end
@@ -613,6 +625,7 @@
 +
  function love.mousepressed(x, y, button, touch)
 +    if _ignore_phantom_mouse(touch) then return end
++    x, y = _transform_rotated_input(x, y)
 +    _logcat("BALATRO_INPUT", string.format("MOUSEPRESSED: x=%s y=%s button=%s touch=%s", tostring(x), tostring(y), tostring(button), tostring(touch)))
 +    if not (G and G.CONTROLLER) then return end
 +
@@ -720,6 +733,7 @@
  function love.mousemoved(x, y, dx, dy, istouch)
 -	if isTvOs then
 +    if _ignore_phantom_mouse(istouch) then return end
++    x, y, dx, dy = _transform_rotated_input(x, y, dx or 0, dy or 0)
 +    if not (G and G.CONTROLLER) then return end
 +    dx = dx or 0
 +    dy = dy or 0
@@ -940,8 +954,18 @@
 +	_force_android_portrait_hints()
 +
 +	local os_name = love.system.getOS()
++	local is_mobile = (os_name == 'Android' or os_name == 'iOS')
++	G.F_ROTATED_LANDSCAPE = is_mobile and G.SETTINGS and G.SETTINGS.portrait_display_mode == 2 or false
++	G.F_PORTRAIT = is_mobile or (h > w)
++	G.F_PORTRAIT_LAYOUT = not G.F_ROTATED_LANDSCAPE and G.F_PORTRAIT
++	if G.F_ROTATED_LANDSCAPE then
++		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = w, h
++		w, h = h, w
++	else
++		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = w, h
++	end
 +	if (os_name == 'Android' or os_name == 'iOS') then
-+		if w > h then
++\t\tif w > h and not G.F_ROTATED_LANDSCAPE then
 +			if not G.window_prev or not G.CANV_SCALE then return end
 +			if G.CANVAS then G.CANVAS:release() end
 +			G.CANVAS = love.graphics.newCanvas(w*G.CANV_SCALE, h*G.CANV_SCALE, {type = '2d', readable = true})
@@ -970,7 +994,7 @@
 -		else
 -			G.ROOM.T.y = G.ROOM_PADDING_H
 -			G.ROOM.T.x = (w/(G.TILESIZE*G.TILESCALE) - (G.ROOM.T.w+G.ROOM_PADDING_W))/2 + G.ROOM_PADDING_W/2
-+	if G.F_PORTRAIT then
++\tif G.F_PORTRAIT_LAYOUT then
 +		local portrait_scale_factor = get_portrait_scale(w, h)
 +		G.TILESCALE = w / (G.TILE_W * portrait_scale_factor * G.TILESIZE)
 +
