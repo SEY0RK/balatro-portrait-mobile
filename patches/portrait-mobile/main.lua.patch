@@ -965,7 +965,7 @@
 +		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = w, h
 +	end
 +	if (os_name == 'Android' or os_name == 'iOS') then
-+\t\tif w > h and not G.F_ROTATED_LANDSCAPE then
++		if w > h and not G.F_ROTATED_LANDSCAPE then
 +			if not G.window_prev or not G.CANV_SCALE then return end
 +			if G.CANVAS then G.CANVAS:release() end
 +			G.CANVAS = love.graphics.newCanvas(w*G.CANV_SCALE, h*G.CANV_SCALE, {type = '2d', readable = true})
@@ -994,7 +994,7 @@
 -		else
 -			G.ROOM.T.y = G.ROOM_PADDING_H
 -			G.ROOM.T.x = (w/(G.TILESIZE*G.TILESCALE) - (G.ROOM.T.w+G.ROOM_PADDING_W))/2 + G.ROOM_PADDING_W/2
-+\tif G.F_PORTRAIT_LAYOUT then
++	if G.F_PORTRAIT_LAYOUT then
 +		local portrait_scale_factor = get_portrait_scale(w, h)
 +		G.TILESCALE = w / (G.TILE_W * portrait_scale_factor * G.TILESIZE)
 +
