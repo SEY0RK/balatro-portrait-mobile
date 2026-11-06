@@ -16,10 +16,10 @@
 +        -- Early exit if ROOM is not initialized
 +        if not G.ROOM or not G.ROOM.T then return end
 +        
-+        if G.F_PORTRAIT and portrait_place_areas() then
++        if G.F_PORTRAIT_LAYOUT and portrait_place_areas() then
 +            -- One-Thumb and Focus place the areas in their frame
 +            -- (portrait_layouts.lua).
-+        elseif G.F_PORTRAIT then
++        elseif G.F_PORTRAIT_LAYOUT then
 +            local pc = PORTRAIT_CONFIG
 +            local room_w = G.ROOM.T.w or 10
 +            local room_h = G.ROOM.T.h or 20
@@ -128,7 +128,7 @@
 -            G.title_top.T.x = G.TILE_W/2 - G.title_top.T.w/2
 -            G.title_top.T.y = G.TILE_H/2 - G.title_top.T.h/2 - 2
 +    if G.STAGE == G.STAGES.MAIN_MENU and G.title_top then
-+        if G.F_PORTRAIT then
++        if G.F_PORTRAIT_LAYOUT then
 +            -- Portrait main menu: center logo in visible area
 +            G.title_top.T.x = G.ROOM.T.w/2 - G.title_top.T.w/2
 +            G.title_top.T.y = G.ROOM.T.h * 0.15
@@ -176,7 +176,7 @@
 +    local y_offset_base = 0
 +    local corner_y_offset = 0
 +    local corner_x_offset = 0
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        local pc = PORTRAIT_CONFIG.main_menu
 +        x_offset_base = pc.x_offset_base
 +        x_offset_plus = pc.x_offset_plus
@@ -187,7 +187,7 @@
 +        corner_x_offset = x_offset_base + corner_inset
 +    end
 +    local menu_x_offset = x_offset_base*2+x_offset_plus
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        menu_x_offset = 0
 +    end
 +
@@ -198,7 +198,7 @@
 +        config = {align="bmi", offset = {x=menu_x_offset,y=10}, major = G.ROOM_ATTACH, bond = 'Weak'}
      }
 -    G.MAIN_MENU_UI.alignment.offset.y = 0
-+    G.MAIN_MENU_UI.alignment.offset.y = y_offset_base - (G.F_PORTRAIT and get_portrait_menu_lift() or 0)
++    G.MAIN_MENU_UI.alignment.offset.y = y_offset_base - (G.F_PORTRAIT_LAYOUT and get_portrait_menu_lift() or 0)
      G.MAIN_MENU_UI:align_to_major()
      G.E_MANAGER:add_event(Event({
          blockable = false,
@@ -213,7 +213,7 @@
 +            -- as far as its own side has room for, measured from where the
 +            -- column actually landed.
 +            local function fitted_offset(box, right_side)
-+                if not (G.F_PORTRAIT and box and box.T and G.MAIN_MENU_UI and G.MAIN_MENU_UI.T
++                if not (G.F_PORTRAIT_LAYOUT and box and box.T and G.MAIN_MENU_UI and G.MAIN_MENU_UI.T
 +                        and G.ROOM and G.ROOM.T) then
 +                    return corner_x_offset
 +                end
@@ -238,7 +238,7 @@
 +                G.PROFILE_BUTTON.alignment.offset.x = fitted_offset(G.PROFILE_BUTTON, false)
 +                G.PROFILE_BUTTON:align_to_major()
              end
-+            if G.F_PORTRAIT and not G.F_ENGLISH_ONLY then
++            if G.F_PORTRAIT_LAYOUT and not G.F_ENGLISH_ONLY then
 +                G.LANGUAGE_BUTTON = UIBox{
 +                    definition = create_UIBox_language_button(),
 +                    config = {align="bri", offset = {x=10,y=corner_y_offset}, major = G.ROOM_ATTACH, bond = 'Weak'}}
@@ -257,7 +257,7 @@
      local num_dollars = config.dollars or 1
      local scale = 0.9
 +    local function center_round_eval()
-+        if G.F_PORTRAIT and G.round_eval and G.ROOM and G.ROOM.T then
++        if G.F_PORTRAIT_LAYOUT and G.round_eval and G.ROOM and G.ROOM.T then
 +            local x = (G.ROOM.T.w - G.round_eval.T.w)/2
 +            if G.round_eval.role and G.round_eval.role.offset and G.round_eval.role.major then
 +                local major = G.round_eval.role.major:get_major()
@@ -328,11 +328,11 @@
 -                      offset ={x=0,y=0.4},
 -                      major = G.round_eval}
 -                }
-+                local cash_out_button = {n=G.UIT.R, config={id = 'cash_out_button', align = "cm", padding = G.F_PORTRAIT and 0.03 or 0.1, minw = G.F_PORTRAIT and 5.7 or 7, r = 0.15, colour = G.C.ORANGE, shadow = true, hover = true, one_press = true, button = 'cash_out', focus_args = {snap_to = true}}, nodes={
-+                    {n=G.UIT.T, config={text = localize('b_cash_out')..": ", scale = G.F_PORTRAIT and 0.82 or 1, colour = G.C.UI.TEXT_LIGHT, shadow = true}},
-+                    {n=G.UIT.T, config={text = localize('$')..config.dollars, scale = G.F_PORTRAIT and 1.0 or 1.2*scale, colour = G.C.WHITE, shadow = true, juice = true}}
++                local cash_out_button = {n=G.UIT.R, config={id = 'cash_out_button', align = "cm", padding = G.F_PORTRAIT_LAYOUT and 0.03 or 0.1, minw = G.F_PORTRAIT_LAYOUT and 5.7 or 7, r = 0.15, colour = G.C.ORANGE, shadow = true, hover = true, one_press = true, button = 'cash_out', focus_args = {snap_to = true}}, nodes={
++                    {n=G.UIT.T, config={text = localize('b_cash_out')..": ", scale = G.F_PORTRAIT_LAYOUT and 0.82 or 1, colour = G.C.UI.TEXT_LIGHT, shadow = true}},
++                    {n=G.UIT.T, config={text = localize('$')..config.dollars, scale = G.F_PORTRAIT_LAYOUT and 1.0 or 1.2*scale, colour = G.C.WHITE, shadow = true, juice = true}}
 +                }}
-+                if G.F_PORTRAIT then
++                if G.F_PORTRAIT_LAYOUT then
 +                    G.round_eval:add_child(cash_out_button, G.round_eval:get_UIE_by_ID('eval_bottom'))
 +                else
 +                    UIBox{
@@ -524,7 +524,7 @@
 +            y = source_attach.offset and source_attach.offset.y or 0
 +        }
 +    }
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        if attach.offset then
 +            attach.offset.y = (attach.offset.y or 0) + 2
 +        else
@@ -552,7 +552,7 @@
 -                if not args.no_button then G.OVERLAY_TUTORIAL.Jimbo:add_button(button.button, button.func, button.colour, button.update_func, true) end
 +                if not args.no_button then
 +                    G.OVERLAY_TUTORIAL.Jimbo:add_button(button.button, button.func, button.colour, button.update_func, true)
-+                    if G.F_PORTRAIT and G.OVERLAY_TUTORIAL.Jimbo.children.button and G.OVERLAY_TUTORIAL.Jimbo.children.speech_bubble then
++                    if G.F_PORTRAIT_LAYOUT and G.OVERLAY_TUTORIAL.Jimbo.children.button and G.OVERLAY_TUTORIAL.Jimbo.children.speech_bubble then
 +                        G.OVERLAY_TUTORIAL.Jimbo.children.button:set_alignment({
 +                            major = G.OVERLAY_TUTORIAL.Jimbo.children.speech_bubble,
 +                            type = 'bm',
