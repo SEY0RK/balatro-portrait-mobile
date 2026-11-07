@@ -1415,7 +1415,7 @@
                {n=G.UIT.R, config={align = "cm", minh = 0.6}, nodes={
                  {n=G.UIT.O, config={w=0.5,h=0.5, colour = G.C.BLUE, object = stake_sprite, hover = true, can_collide = false}},
                  {n=G.UIT.B, config={h=0.1,w=0.1}},
--                {n=G.UIT.T, config={text = _lformat(blind_amt), scale = score_number_scale(0.9, 10^blind_amt), colour = disabled and G.C.UI.TEXT_INACTIVE or G.C.RED, shadow =  not disabled}}
+-                {n=G.UIT.T, config={text = _lformat(blind_amt), scale = score_number_scale(0.9, 10^blind_amt), lang = G.LANGUAGES['en-us'], colour = disabled and G.C.UI.TEXT_INACTIVE or G.C.RED, shadow =  not disabled}}
 +                {n=G.UIT.T, config={text = _lformat(blind_amt), scale = score_number_scale(G.F_PORTRAIT_LAYOUT and 1.0 or 0.9, 10^blind_amt), colour = disabled and G.C.UI.TEXT_INACTIVE or G.C.RED, shadow =  not disabled}}
                }},
                _reward and {n=G.UIT.R, config={align = "cm"}, nodes={
