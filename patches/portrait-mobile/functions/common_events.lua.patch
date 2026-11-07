@@ -145,7 +145,7 @@
          end
  
 -        G.title_top:hard_set_VT()
-+        G.title_top:hard_set_VT(); if G.F_PORTRAIT_LAYOUT and G.SPLASH_LOGO then G.SPLASH_LOGO:align_to_major(); G.SPLASH_LOGO:hard_set_VT() end
++        G.title_top:hard_set_VT(); if G.F_PORTRAIT_LAYOUT and G.SPLASH_LOGO then G.SPLASH_LOGO.alignment.prev_offset.x = nil; G.SPLASH_LOGO:align_to_major(); G.SPLASH_LOGO:hard_set_VT() end
 @@ -414,7 +498,6 @@
              if not mute and drawn then
                  if from == G.deck or from == G.hand or from == G.play or from == G.jokers or from == G.consumeables or from == G.discard then
