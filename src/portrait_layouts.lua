@@ -1632,7 +1632,8 @@ function Game:update(dt)
   local pending_layout = G.PORTRAIT_LAYOUT_RELOAD_PENDING
   if pending_layout then
     local w, h = love.graphics.getDimensions()
-    local target_reached = pending_layout.mode == 2 and w > h or pending_layout.mode ~= 2 and h > w
+    local target_reached = pending_layout.orientation_requested
+      and (pending_layout.mode == 2 and w > h or pending_layout.mode ~= 2 and h > w)
     if target_reached and not G.PORTRAIT_RESIZE_PENDING then
       if pending_layout.last_w == w and pending_layout.last_h == h then
         pending_layout.stable_frames = (pending_layout.stable_frames or 0) + 1
@@ -1647,23 +1648,36 @@ function Game:update(dt)
 
     local scene_ready = G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU
     if pending_layout.stable_frames >= 2 and scene_ready then
-      G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
       if switch_metrics and switch_metrics.active then
         switch_metrics.surface_wait_ms = (love.timer.getTime() - (switch_metrics.orientation_finished_at or pending_layout.started_at)) * 1000
       end
-      local ok, err = portrait_restart_scene_for_layout_change(pending_layout.snapshot)
-      if not ok then
+      local ok, err
+      if pending_layout.prestarted_wipe then
+        ok, err = portrait_restart_scene_under_existing_wipe(pending_layout)
+      else
+        ok, err = portrait_restart_scene_for_layout_change(pending_layout.snapshot)
+      end
+      if ok then
+        G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+      elseif pending_layout.prestarted_wipe then
+        portrait_abort_android_layout_transition(pending_layout, 'scene_restart', err)
+      else
+        G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
         G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
         G:save_settings()
         pcall(portrait_request_android_orientation, pending_layout.previous_mode)
         print('PORTRAIT LAYOUT RELOAD ABORTED: ' .. tostring(err))
       end
     elseif love.timer.getTime() - pending_layout.started_at > 10 then
-      G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
-      G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
-      G:save_settings()
-      pcall(portrait_request_android_orientation, pending_layout.previous_mode)
-      print('PORTRAIT ORIENTATION CHANGE TIMED OUT; previous mode restored')
+      if pending_layout.prestarted_wipe then
+        portrait_abort_android_layout_transition(pending_layout, 'orientation_timeout', 'target surface did not stabilize within 10 seconds')
+      else
+        G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+        G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
+        G:save_settings()
+        pcall(portrait_request_android_orientation, pending_layout.previous_mode)
+        print('PORTRAIT ORIENTATION CHANGE TIMED OUT; previous mode restored')
+      end
     end
   end
 
