@@ -1,7 +1,6 @@
 --- a/functions/misc_functions.lua
 +++ b/functions/misc_functions.lua
 @@ -60,6 +60,99 @@
-
    return res_option
  end
  
@@ -102,7 +101,6 @@
    G.PREV_GARB = G.PREV_GARB or 0
    if not G.F_ENABLE_PERF_OVERLAY then return end
 @@ -103,27 +196,24 @@
-
  end
  
  function boot_timer(_label, _next, progress)
@@ -149,7 +147,6 @@
    G.ARGS.bt = G.ARGS.bt or love.timer.getTime()
    G.ARGS.bt = love.timer.getTime()
 @@ -697,6 +787,23 @@
-
  
  function play_sound(sound_code, per, vol)
    if G.F_MUTE then return end
@@ -174,7 +171,6 @@
      G.ARGS.play_sound = G.ARGS.play_sound or {}
      G.ARGS.play_sound.type = 'sound'
 @@ -1015,12 +1124,6 @@
-
    end
  end
  
@@ -188,7 +184,6 @@
    if not amt or type(amt) ~= 'number' then return end
    if G.GAME.round_scores[score] and math.floor(amt) > G.GAME.round_scores[score].amt then
 @@ -1065,8 +1168,7 @@
-
  end
  
  function get_joker_win_sticker(_center, index)
@@ -199,7 +194,6 @@
      local _w = 0
      for k, v in pairs(G.PROFILES[G.SETTINGS.profile].joker_usage[_center.key].wins) do
 @@ -1264,18 +1366,6 @@
-
    G:save_settings()
  end
  
@@ -219,7 +213,6 @@
    G.PROGRESS = G.PROGRESS or {
      joker_stickers = {tally = 0, of = 0},
 @@ -1471,8 +1561,6 @@
-
  
  function save_run()
    if G.F_NO_SAVING == true then return end
@@ -229,7 +222,6 @@
    for k, v in pairs(G) do
      if (type(v) == "table") and v.is and v:is(CardArea) then 
 @@ -1499,7 +1587,6 @@
-
      BACK = G.GAME.selected_back:save(),
      VERSION = G.VERSION
    }
@@ -238,7 +230,6 @@
  
    G.FILE_HANDLER = G.FILE_HANDLER or {}
 @@ -1508,8 +1595,7 @@
-
  end
  
  function remove_save()
@@ -249,7 +240,6 @@
    G.FILE_HANDLER.run = nil
  end
 @@ -1539,7 +1625,7 @@
-
      legendary = G.C.RARITY[4],
      enhanced = G.C.SECONDARY_SET.Enhanced
    }
@@ -259,7 +249,6 @@
  
  function init_localization()
 @@ -1607,6 +1693,45 @@
-
    end
  end
  
@@ -306,7 +295,6 @@
    G.playing_card = (G.playing_card and G.playing_card + 1) or 1
    local _card = Card(G.deck.T.x, G.deck.T.y, G.CARD_W, G.CARD_H, G.P_CARDS[control.s..'_'..control.r], G.P_CENTERS[control.e or 'c_base'], {playing_card = G.playing_card})
 @@ -1744,7 +1869,8 @@
-
            assembled_string = assembled_string..(type(subpart) == 'string' and subpart or args.vars[tonumber(subpart[1])] or 'ERROR')
          end
          local desc_scale = G.LANG.font.DESCSCALE
@@ -317,7 +305,6 @@
            final_line[#final_line+1] = {n=G.UIT.O, config={
              object = DynaText({string = {assembled_string},
 @@ -1859,6 +1985,9 @@
-
      reroll_cost = 5,
      joker_slots = 5,
      ante_scaling = 1,
@@ -328,7 +315,6 @@
      no_faces = false,
      erratic_suits_and_ranks = false,
 @@ -1873,11 +2002,6 @@
-
    end
  end
  
@@ -341,7 +327,6 @@
  function PLAY_SOUND(args)
    args.per = args.per or 1
 @@ -1894,9 +2018,6 @@
-
    s.created_on_state = args.state
    s.sfx_handled = 0
    s.transition_timer = 0
@@ -352,7 +337,6 @@
    love.audio.play(s.sound)
    return s
 @@ -1913,7 +2034,6 @@
-
  end
  
  function SET_SFX(s, args)
@@ -361,7 +345,6 @@
        if s.sound_code == args.desired_track then
            s.current_volume = s.current_volume or 1
 @@ -1953,7 +2073,7 @@
-
    for k, v in pairs(SOURCES) do
      local i=1
      while i <= #v do
@@ -371,7 +354,6 @@
          else
              i = i + 1
 @@ -2014,314 +2134,3 @@
-
        end
    end
  end
