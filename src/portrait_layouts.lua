@@ -1377,7 +1377,8 @@ function Game:update(dt)
       pending_layout.last_w, pending_layout.last_h = w, h
     end
 
-    if pending_layout.stable_frames >= 2 then
+    local scene_ready = G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU
+    if pending_layout.stable_frames >= 2 and scene_ready then
       G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
       local ok, err = portrait_restart_scene_for_layout_change(pending_layout.snapshot)
       if not ok then
