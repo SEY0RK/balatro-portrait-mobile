@@ -1355,8 +1355,25 @@ local function lift_tutorial(ot)
   end
 end
 
+-- The stock Game:init_window creates WINDOWTRANS with only logical game
+-- bounds. The Android/LÖVE resize callback may be deferred until the surface
+-- settles, but update_canvas_juice reads real_window_w/h during the first
+-- Game:update. Fill only missing values before entering the original update;
+-- the stabilized resize path will replace them with the final dimensions.
+local function portrait_ensure_real_window_dimensions()
+  if not (G and G.WINDOWTRANS) then return end
+  local width, height = love.graphics.getDimensions()
+  if not G.WINDOWTRANS.real_window_w or G.WINDOWTRANS.real_window_w <= 0 then
+    G.WINDOWTRANS.real_window_w = width
+  end
+  if not G.WINDOWTRANS.real_window_h or G.WINDOWTRANS.real_window_h <= 0 then
+    G.WINDOWTRANS.real_window_h = height
+  end
+end
+
 local portrait_game_update = Game.update
 function Game:update(dt)
+  portrait_ensure_real_window_dimensions()
   portrait_game_update(self, dt)
   -- A cover orientation change is asynchronous. Wait until Android has
   -- delivered the target aspect ratio and the resize debounce has completed,
