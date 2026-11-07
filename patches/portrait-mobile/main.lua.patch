@@ -939,7 +939,7 @@
  			end
  		end
  
-@@ -434,51 +814,172 @@
+@@ -434,50 +814,190 @@
  end
  
  function love.resize(w, h)
