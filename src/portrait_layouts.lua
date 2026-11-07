@@ -956,26 +956,6 @@ function portrait_rebuild_HUD()
   G.HUD:recalculate()
   G.HUD_blind:recalculate()
 
-  if not is_portrait then
-    -- Restore the vanilla panel offsets when leaving portrait mode; these
-    -- boxes may have been moved while the portrait layout was active.
-    if G.shop and not G.shop.REMOVED and G.shop.alignment then
-      G.shop.alignment.offset.y = -5.3
-    end
-    if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.hand and G.jokers then
-      G.blind_select.alignment.offset.y = 0.8 - (G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
-    end
-    if G.round_eval and not G.round_eval.REMOVED and G.round_eval.alignment then
-      G.round_eval.alignment.offset.y = -7.8
-    end
-    if G.HUD_tags and G.HUD_tags[1] then
-      G.HUD_tags[1]:set_alignment({
-        type = 'bri', offset = {x = 0.7, y = 0},
-        xy_bond = 'Weak', major = G.ROOM_ATTACH
-      })
-    end
-  end
-
   if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
     G.hand_preview = UIBox{
       definition = create_UIBox_hand_preview(),
@@ -1060,14 +1040,52 @@ end
 --After a style switch the hand has moved; put an open shop or blind select
 --back where their builders would have. set_screen_positions leaves the hand
 --short of its rest, and a panel placed from there ended 0.35 too low.
+local function portrait_realign_box(box)
+  if not (box and not box.REMOVED and box.alignment) then return end
+  if box.align_to_major then box:align_to_major() end
+  if box.hard_set_VT then box:hard_set_VT() end
+end
+
 function portrait_reflow_panels()
   if not G.F_PORTRAIT_LAYOUT or not G.hand then return end
   G.hand.T.y = portrait_hand_rest_y()
   if G.shop and not G.shop.REMOVED and G.STATE == G.STATES.SHOP then
     G.shop.alignment.offset.y = portrait_shop_offset()
+    portrait_realign_box(G.shop)
   end
   if G.blind_select and not G.blind_select.REMOVED and G.STATE == G.STATES.BLIND_SELECT then
     G.blind_select.alignment.offset.y = portrait_blind_select_offset()
+    portrait_realign_box(G.blind_select)
+  end
+end
+
+--Leaving portrait previously restored panel offsets inside portrait_rebuild_HUD,
+--before set_screen_positions put the hand and joker shelf back in landscape
+--coordinates. The blind-select formula therefore used stale hand coordinates.
+--Run this only after the card areas have their final landscape positions.
+function portrait_restore_landscape_panels()
+  if not (G and not G.F_PORTRAIT_LAYOUT) then return end
+
+  if G.shop and not G.shop.REMOVED and G.shop.alignment then
+    G.shop.alignment.offset.y = -5.3
+    portrait_realign_box(G.shop)
+  end
+  if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.hand and G.jokers then
+    G.blind_select.alignment.offset.y = 0.8 - (G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
+    portrait_realign_box(G.blind_select)
+  end
+  if G.round_eval and not G.round_eval.REMOVED and G.round_eval.alignment then
+    G.round_eval.alignment.offset.y = -7.8
+    portrait_realign_box(G.round_eval)
+  end
+  if G.HUD_tags and G.HUD_tags[1] then
+    G.HUD_tags[1]:set_alignment({
+      type = 'bri', offset = {x = 0.7, y = 0},
+      xy_bond = 'Weak', major = G.ROOM_ATTACH
+    })
+    for _, tag in ipairs(G.HUD_tags) do
+      portrait_realign_box(tag)
+    end
   end
 end
 
@@ -1115,6 +1133,18 @@ end
 --Classic / One-Thumb / Focus selector. Rebuild the HUD first: One-Thumb's
 --score dock and Focus's blind panel are created by their HUD builders. Only
 --then place the card areas against the new HUD and rebuild the button bar.
+--Orientation/layout changes made from the Settings overlay get one
+--more refresh after that overlay is dismissed. This catches UIBoxes that were
+--still aligned to the old room while the settings panel covered the game.
+function portrait_flush_pending_layout_refresh()
+  if not (G and G.PORTRAIT_LAYOUT_PENDING_REFRESH) then return end
+  G.PORTRAIT_LAYOUT_PENDING_REFRESH = nil
+  if G.STAGE ~= G.STAGES.RUN then return end
+  local w, h = love.graphics.getDimensions()
+  love.resize(w, h)
+  portrait_apply_live_layout()
+end
+
 function portrait_apply_live_layout()
   if not G then return end
   if G.STAGE == G.STAGES.RUN then
@@ -1123,6 +1153,8 @@ function portrait_apply_live_layout()
     if G.F_PORTRAIT_LAYOUT then
       portrait_reflow_panels()
       portrait_arrange_tags()
+    else
+      portrait_restore_landscape_panels()
     end
     if G.buttons and rebuild_buttons_uibox then rebuild_buttons_uibox() end
   elseif G.STAGE == G.STAGES.MAIN_MENU then
