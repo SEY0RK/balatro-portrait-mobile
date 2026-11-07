@@ -1211,18 +1211,6 @@ end
 --Classic / One-Thumb / Focus selector. Rebuild the HUD first: One-Thumb's
 --score dock and Focus's blind panel are created by their HUD builders. Only
 --then place the card areas against the new HUD and rebuild the button bar.
---Orientation/layout changes made from the Settings overlay get one
---more refresh after that overlay is dismissed. This catches UIBoxes that were
---still aligned to the old room while the settings panel covered the game.
-function portrait_flush_pending_layout_refresh()
-  if not (G and G.PORTRAIT_LAYOUT_PENDING_REFRESH) then return end
-  G.PORTRAIT_LAYOUT_PENDING_REFRESH = nil
-  if G.STAGE ~= G.STAGES.RUN then return end
-  local w, h = love.graphics.getDimensions()
-  love.resize(w, h)
-  portrait_apply_live_layout()
-end
-
 function portrait_apply_live_layout()
   if not G then return end
   if G.STAGE == G.STAGES.RUN then
