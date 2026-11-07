@@ -1311,6 +1311,19 @@ end
 local portrait_game_update = Game.update
 function Game:update(dt)
   portrait_game_update(self, dt)
+  -- A Fold6 cover/inner transition changes both Android's system orientation
+  -- and the game's logical layout. Re-enter the same saved run once the new
+  -- surface size is stable so every CardArea, blind panel and HUD is created
+  -- against the final viewport rather than being moved in place.
+  if G.PORTRAIT_FOLD_RELOAD_PENDING
+     and (G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU) then
+    G.PORTRAIT_FOLD_RELOAD_PENDING = nil
+    local ok, err = portrait_restart_scene_for_layout_change()
+    if not ok then
+      G.PORTRAIT_FOLD_RELOAD_PENDING = true
+      print('FOLD DISPLAY RELOAD DEFERRED: ' .. tostring(err))
+    end
+  end
   local ot = G.OVERLAY_TUTORIAL
   if G.F_PORTRAIT_LAYOUT and ot and not ot.REMOVED then
     stack_tutorial(ot)
