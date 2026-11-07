@@ -1,26 +1,13 @@
 --- a/main.lua
 +++ b/main.lua
-@@ -1,9 +1,61 @@
+@@ -1,9 +1,49 @@
 -if (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
 +if (love.system.getOS() == 'OS X' ) and (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
  
 +local function _force_android_portrait_hints()
-+    if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then return end
-+    if not (love and love.window and love.window.setMode) then return end
- 
-+    pcall(function()
-+        if love.window.setHint then
-+            love.window.setHint("screenorientation", "portrait")
-+            love.window.setHint("screenorientation", "fixed")
-+        end
-+    end)
-+
-+    pcall(function()
-+        local w, h, flags = love.window.getMode()
-+        flags = flags or {}
-+        flags.resizable = false
-+        love.window.setMode(w, h, flags)
-+    end)
++    -- System orientation is selected by SDLActivity from
++    -- Configuration.smallestScreenWidthDp: Fold inner = landscape,
++    -- cover = portrait. Do not force the old portrait-only SDL hint.
 +end
 +
 +local function _logcat(tag, msg)
@@ -262,9 +249,12 @@
 -	end
 +	_force_android_portrait_hints()
 +
++	local initial_screen_w, initial_screen_h = love.graphics.getDimensions()
++	G.F_FOLD_INNER = os_name == 'Android' and initial_screen_w > initial_screen_h
 +	G.F_ROTATED_LANDSCAPE = (os_name == 'Android' or os_name == 'iOS')
-+		and G.SETTINGS and G.SETTINGS.portrait_display_mode == 2 or false
-+	G.F_PORTRAIT_LAYOUT = not G.F_ROTATED_LANDSCAPE and not not G.F_PORTRAIT
++		and not G.F_FOLD_INNER and G.SETTINGS
++		and G.SETTINGS.portrait_display_mode == 2 or false
++	G.F_PORTRAIT_LAYOUT = not G.F_FOLD_INNER and not G.F_ROTATED_LANDSCAPE and not not G.F_PORTRAIT
  
 -	if splashVideo then
 -		shouldSplash = true
