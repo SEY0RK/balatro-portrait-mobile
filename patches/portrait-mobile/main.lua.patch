@@ -977,7 +977,7 @@
  			end
  		end
  
-@@ -434,51 +857,212 @@
+@@ -434,52 +857,212 @@
  end
  
 -function love.resize(w, h)
@@ -988,7 +988,7 @@
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
 -		h = w/1
 -	end
-+ 
+ 
 -	--When the window is resized, this code resizes the Canvas, then places the 'room' or gamearea into the middle without streching it
 -	if w/h < G.window_prev.orig_ratio then
 -		G.TILESCALE = G.window_prev.orig_scale*w/G.window_prev.w
@@ -1006,7 +1006,7 @@
 +	G.F_ROTATED_LANDSCAPE = false
 +	G.F_PORTRAIT = is_mobile or (h > w)
 +	G.F_PORTRAIT_LAYOUT = (os_name == 'Android' and not G.F_FOLD_INNER
-+		and (G.SETTINGS.portrait_display_mode or 1) == 1)
++		and (G.SETTINGS and G.SETTINGS.portrait_display_mode or 1) == 1)
 +		or (os_name == 'iOS' and h > w)
 +	if G.FOLD_LAYOUT_INITIALIZED and old_fold_inner ~= G.F_FOLD_INNER then
 +		G.PORTRAIT_FOLD_RELOAD_PENDING = true
