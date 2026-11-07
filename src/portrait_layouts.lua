@@ -882,6 +882,20 @@ function portrait_place_areas()
   return true
 end
 
+--Place the portrait HUD only after its final UIBox width has been measured.
+--ROOM is a Node (not a Moveable role major), so the vanilla portrait path
+--intentionally positions the HUD directly rather than relying on role offsets.
+function portrait_position_run_hud(hud)
+  hud = hud or (G and G.HUD)
+  if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T
+          and hud and not hud.REMOVED and hud.T and hud.VT) then return end
+
+  local x = G.ROOM.T.x + (G.ROOM.T.w - hud.T.w) / 2
+  hud.T.x, hud.VT.x = x, x
+  if hud.velocity then hud.velocity.x = 0 end
+  if hud.UIRoot and hud.UIRoot.initialize_VT then hud.UIRoot:initialize_VT() end
+end
+
 -- Switching styles in a run
 -- ===========================================================================
 
@@ -955,9 +969,7 @@ function portrait_rebuild_HUD()
   }
   G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
   G.HUD:recalculate()
-  if is_portrait then
-    G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
-  end
+  if is_portrait then portrait_position_run_hud(G.HUD) end
   G.HUD_blind:recalculate()
 
   if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
