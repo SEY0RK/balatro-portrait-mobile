@@ -975,7 +975,7 @@
  			end
  		end
  
-@@ -434,49 +856,196 @@
+@@ -434,49 +856,212 @@
  end
  
 -function love.resize(w, h)
@@ -1007,6 +1007,22 @@
 +		G.PORTRAIT_FOLD_RELOAD_PENDING = true
 +	end
 +	G.FOLD_LAYOUT_INITIALIZED = true
++	if old_fold_inner and not G.F_FOLD_INNER and os_name == 'Android' then
++		-- Android restores the Activity's last native cover orientation first.
++		-- Re-assert the game's persisted setting because the Activity field is
++		-- only an in-memory fallback and may be empty after a fresh process start.
++		local cover_mode = G.SETTINGS and G.SETTINGS.portrait_display_mode or 1
++		local orientation_ok, orientation_err = portrait_request_android_orientation(cover_mode)
++		if orientation_ok then
++			G.PORTRAIT_FOLD_RELOAD_PENDING = nil
++			G.PORTRAIT_LAYOUT_RELOAD_PENDING = {
++				mode = cover_mode, previous_mode = cover_mode,
++				started_at = love.timer.getTime(), stable_frames = 0
++			}
++		else
++			print('FOLD6 COVER ORIENTATION RESTORE FAILED: '..tostring(orientation_err))
++		end
++	end
 +	G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
 +	if is_mobile then
 +		G.F_PORTRAIT = true
