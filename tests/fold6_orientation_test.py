@@ -18,6 +18,12 @@ BASE = """.class public Lorg/libsdl/app/SDLActivity;
     .locals 0
     return-void
 .end method
+
+.method sendCommand(ILjava/lang/Object;)Z
+    .locals 5
+    const-wide/16 v1, 0x1f4
+    return v0
+.end method
 """
 
 
@@ -51,6 +57,8 @@ def main():
     assert ".method private balatroApplyFoldOrientation()V" in result
     assert ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V" in result
     assert result.count("balatroApplyFoldOrientation()V") == 2
+    assert "const-wide/16 v1, 0xc8" in result
+    assert "const-wide/16 v1, 0x1f4" not in result
 
     existing_callback = BASE + """.method protected onConfigurationChanged(Landroid/content/res/Configuration;)V
     .locals 0
