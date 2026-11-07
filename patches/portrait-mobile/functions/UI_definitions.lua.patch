@@ -1640,7 +1640,7 @@
 @@ -2460,1 +2987,3 @@
        create_option_cycle({w = 5, label = localize('b_set_play_discard_pos'),scale = 0.8, options = localize('ml_play_discard_pos_opt'), opt_callback = 'change_play_discard_position', current_option = (G.SETTINGS.play_button_pos)}),
 +      G.F_PORTRAIT and create_option_cycle({w = 5, label = 'Display Orientation',scale = 0.8, options = PORTRAIT_DISPLAY_MODES, opt_callback = 'change_portrait_display_mode', current_option = (G.SETTINGS.portrait_display_mode or 1)}) or nil,
-+      G.F_PORTRAIT_LAYOUT and create_option_cycle({w = 5, label = 'Layout',scale = 0.8, options = PORTRAIT_LAYOUT_NAMES, opt_callback = 'change_portrait_layout', current_option = (G.SETTINGS.portrait_layout or 1)}) or nil,
++      G.F_PORTRAIT and create_option_cycle({w = 5, label = 'Layout',scale = 0.8, options = PORTRAIT_LAYOUT_NAMES, opt_callback = 'change_portrait_layout', current_option = (G.SETTINGS.portrait_layout or 1)}) or nil,
 @@ -2442,7 +3044,8 @@
        create_option_cycle({w = 4,scale = 0.8, label = localize("b_set_shadows"),options = localize('ml_shadow_opt'), opt_callback = 'change_shadows', current_option = (G.SETTINGS.GRAPHICS.shadows == 'On' and 1 or 2)}),
        create_option_cycle({w = 4,scale = 0.8, label = localize("b_set_pixel_smoothing"),options = localize('ml_smoothing_opt'), opt_callback = 'change_pixel_smoothing', current_option = G.SETTINGS.GRAPHICS.texture_scaling}),
