@@ -1056,6 +1056,13 @@ def _apktool(jar, args):
 
 
 def _patch_sdl_portrait_orientation(apk_out):
+    """Lock Android system UI by Fold6 display class, never by motion sensors.
+
+    Fold cover screens have smallestScreenWidthDp below 600dp; the unfolded
+    inner display is a large-screen configuration at or above 600dp. Read the
+    framework configuration rather than the current w/h so the decision is
+    stable after the Activity has been locked to landscape/portrait.
+    """
     smali_path = os.path.join(apk_out, "smali", "org", "libsdl", "app", "SDLActivity.smali")
     if not os.path.exists(smali_path):
         raise FileNotFoundError(f"SDLActivity.smali not found at {smali_path}")
@@ -1063,7 +1070,7 @@ def _patch_sdl_portrait_orientation(apk_out):
     with open(smali_path, "r", encoding="utf-8") as f:
         smali = f.read()
 
-    marker = "# Balatro Portrait: force portrait orientation"
+    marker = "# Balatro Foldable: orientation from smallestScreenWidthDp"
     if marker in smali:
         return
 
@@ -1077,23 +1084,68 @@ def _patch_sdl_portrait_orientation(apk_out):
         raise RuntimeError(f"{signature} has no .end method in {smali_path}")
 
     method_body = smali[method_start:method_end]
-    header_match = re.search(r"(?m)^(\s+\.(?:locals|registers)\s+\d+\s*)$", method_body)
+    header_match = re.search(r"(?m)^\\s+\\.(?:locals|registers)\\s+\\d+\\s*$", method_body)
     if not header_match:
         raise RuntimeError(f"{signature} has no .locals/.registers header in {smali_path}")
 
+    # p1/p2 are the width/height arguments. They are no longer needed because
+    # this Activity must follow the current physical foldable display, not the
+    # orientation requested by the game's old portrait hint.
     insert_at = method_start + header_match.end()
     injected = (
-        "\n"
-        f"    {marker}\n"
-        "    const/4 p1, 0x1\n"
-        "    invoke-virtual {p0, p1}, Landroid/app/Activity;->setRequestedOrientation(I)V\n"
-        "    return-void\n"
+        "\\n"
+        f"    {marker}\\n"
+        "    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;\\n"
+        "    move-result-object p2\\n"
+        "    invoke-virtual {p2}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;\\n"
+        "    move-result-object p2\\n"
+        "    iget p2, p2, Landroid/content/res/Configuration;->smallestScreenWidthDp:I\\n"
+        "    const/16 p1, 0x258\\n"
+        "    if-lt p2, p1, :balatro_fold_cover\\n"
+        "    const/4 p1, 0x0\\n"
+        "    goto :balatro_fold_apply\\n"
+        "    :balatro_fold_cover\\n"
+        "    const/4 p1, 0x1\\n"
+        "    :balatro_fold_apply\\n"
+        "    invoke-virtual {p0, p1}, Landroid/app/Activity;->setRequestedOrientation(I)V\\n"
+        "    return-void\\n"
     )
     smali = smali[:insert_at] + injected + smali[insert_at:]
 
-    with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(smali)
+    # SDL's stock Activity doesn't override this callback. Add one so folding
+    # and unfolding re-evaluate the smallest display width as soon as Android
+    # delivers screenLayout/smallestScreenSize changes. The same 600dp rule is
+    # applied after every transition; SCREEN_ORIENTATION_LANDSCAPE/PORTRAIT are
+    # fixed orientations and do not follow the accelerometer.
+    if ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V" not in smali:
+        on_config = (
+            "\\n"
+            ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V\\n"
+            "    .locals 2\\n"
+            "    invoke-super {p0, p1}, Landroid/app/Activity;->onConfigurationChanged(Landroid/content/res/Configuration;)V\\n"
+            "    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;\\n"
+            "    move-result-object v0\\n"
+            "    invoke-virtual {v0}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;\\n"
+            "    move-result-object v0\\n"
+            "    iget v0, v0, Landroid/content/res/Configuration;->smallestScreenWidthDp:I\\n"
+            "    const/16 v1, 0x258\\n"
+            "    if-lt v0, v1, :balatro_config_cover\\n"
+            "    const/4 v1, 0x0\\n"
+            "    goto :balatro_config_apply\\n"
+            "    :balatro_config_cover\\n"
+            "    const/4 v1, 0x1\\n"
+            "    :balatro_config_apply\\n"
+            "    invoke-virtual {p0, v1}, Landroid/app/Activity;->setRequestedOrientation(I)V\\n"
+            "    return-void\\n"
+            ".end method\\n"
+        )
+        class_end = smali.rfind(".end class")
+        if class_end == -1:
+            raise RuntimeError(f"Could not find .end class in {smali_path}")
+        smali = smali[:class_end] + on_config + smali[class_end:]
 
+    with open(smali_path, "w", encoding="utf-8", newline="\\n") as f:
+        f.write(smali)
 
 def build_apk(profiler=None):
     """Download tools, package, and sign the always-Lovely Android APK."""
@@ -1148,7 +1200,11 @@ def build_apk(profiler=None):
         m = re.sub(r'android:versionCode="[^"]+"',   f'android:versionCode="{int(time.time())}"', m)
         m = re.sub(r'android:versionName="[^"]+"',   f'android:versionName="{MOD_VERSION}-lovely"', m)
         m = re.sub(r'\sandroid:debuggable="[^"]+"',  "",                                  m)
-        m = re.sub(r'android:screenOrientation="[^"]+"', 'android:screenOrientation="portrait"', m)
+        m = re.sub(r'android:screenOrientation="[^"]+"', 'android:screenOrientation="unspecified"', m)
+        if re.search(r'android:appCategory="[^"]+"', m):
+            m = re.sub(r'android:appCategory="[^"]+"', 'android:appCategory="game"', m)
+        else:
+            m = re.sub(r'(<application\\b)', r'\\1 android:appCategory="game"', m, count=1)
         m = re.sub(r'android:configChanges="[^"]+"',
                    'android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|keyboard|keyboardHidden|navigation"', m)
         with open(manifest_path, "w") as f:
