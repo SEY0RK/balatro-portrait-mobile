@@ -284,23 +284,13 @@
 +  G:save_settings()
 +  local w, h = love.graphics.getDimensions()
 +  love.resize(w, h)
-+  if G.STAGE == G.STAGES.RUN then
-+    pcall(set_screen_positions)
-+    portrait_rebuild_HUD()
-+    if G.buttons then rebuild_buttons_uibox() end
-+    if G.F_PORTRAIT_LAYOUT then portrait_reflow_panels() end
-+  end
++  portrait_apply_live_layout()
 +end
 +
 +G.FUNCS.change_portrait_layout = function(args)
 +  G.SETTINGS.portrait_layout = args.to_key
 +  G:save_settings()
-+  if G.buttons then rebuild_buttons_uibox() end
-+  if G.F_PORTRAIT_LAYOUT then
-+    portrait_rebuild_HUD()
-+    pcall(set_screen_positions)
-+    portrait_reflow_panels()
-+  end
++  if G.F_PORTRAIT_LAYOUT then portrait_apply_live_layout() end
 +end
 +
 +--Frame rate: love.run works the cap out again on the next frame.
