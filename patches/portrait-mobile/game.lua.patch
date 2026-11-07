@@ -1448,7 +1448,7 @@
      G.SPLASH_BACK:set_alignment({
          major = G.play,
          type = 'cm',
-@@ -2611,15 +2469,39 @@
+@@ -2611,15 +2469,43 @@
      self.deck:hard_set_cards()
      
      self.HUD = UIBox{
@@ -1457,11 +1457,15 @@
 +        definition = (G.F_PORTRAIT_LAYOUT and create_UIBox_HUD_vertical() or create_UIBox_HUD()), 
 +        config = {
 +            align = (G.F_PORTRAIT_LAYOUT and 'tm' or 'cli'), 
-+            offset = (G.F_PORTRAIT_LAYOUT and {x=0, y=0.2} or {x=-0.7, y=0}), 
-+            -- ROOM is a Node; ROOM_ATTACH is the Moveable anchor UIBox requires.
-+            major = G.ROOM_ATTACH
++            offset = (G.F_PORTRAIT_LAYOUT and {x=0, y=0} or {x=-0.7, y=0}), 
++            -- Portrait keeps its original ROOM anchor and direct room-based centering.
++            major = (G.F_PORTRAIT_LAYOUT and G.ROOM or G.ROOM_ATTACH)
 +        }
      }
++    if G.F_PORTRAIT_LAYOUT then
++        self.HUD.T.y = 0.2
++        self.HUD.T.x = (G.ROOM.T.w - self.HUD.T.w) / 2
++    end
 +    
      self.HUD_blind = UIBox{
          definition = create_UIBox_HUD_blind(),
@@ -1490,12 +1494,11 @@
      G.hand_text_area = {
          chips = self.HUD:get_UIE_by_ID('hand_chips'),
          mult = self.HUD:get_UIE_by_ID('hand_mult'),
-@@ -2652,6 +2539,8 @@
+@@ -2652,6 +2539,7 @@
      G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
       
      self.HUD:recalculate()
-+    -- The shelves of the non-classic layouts start under the HUD just built.
-+    if G.F_PORTRAIT_LAYOUT then if portrait_center_run_hud then portrait_center_run_hud() end; set_screen_positions() end
++    if G.F_PORTRAIT_LAYOUT then set_screen_positions() end
  
      G.E_MANAGER:add_event(Event({
          trigger = 'immediate',
