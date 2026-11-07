@@ -63,8 +63,12 @@ def main():
 .end class""",
     )
     existing_result = patch(existing_callback)
-    assert existing_result.count("onConfigurationChanged(Landroid/content/res/Configuration;)V") == 1
-    assert existing_result.count("invoke-direct {p0}, Lorg/libsdl/app/SDLActivity;->balatroApplyFoldOrientation()V") == 1
+    assert existing_result.count(
+        ".method protected onConfigurationChanged(Landroid/content/res/Configuration;)V"
+    ) == 1
+    assert existing_result.count(
+        "invoke-direct {p0}, Lorg/libsdl/app/SDLActivity;->balatroApplyFoldOrientation()V"
+    ) == 1
 
     print("Fold6 orientation smali patch tests passed")
 
