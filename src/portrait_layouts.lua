@@ -1112,6 +1112,52 @@ function portrait_arrange_tags()
   end
 end
 
+--Fold6 display classification uses LÖVE's DPI-scaled logical dimensions.
+--The cover's short edge is below 600dp; the unfolded inner display's short
+--edge is above it. Unlike w > h, the minimum dimension remains stable when the
+--cover itself is switched to landscape or when the device rotates by 180°.
+function portrait_fold6_is_inner_display(w, h)
+  if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then return false end
+  if type(w) ~= 'number' or type(h) ~= 'number' then
+    w, h = love.graphics.getDimensions()
+  end
+  return math.min(w, h) >= 600
+end
+
+--Request one of the two sensor-locked orientations from SDL. Toggling the
+--resizable flag deliberately invokes SDL's Android SetWindowResizable hook,
+--which forwards the requested aspect ratio to SDLActivity.setOrientationBis.
+--Our Android smali patch maps that ratio to SENSOR_PORTRAIT / SENSOR_LANDSCAPE.
+function portrait_request_android_orientation(mode)
+  if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then
+    return true
+  end
+  if portrait_fold6_is_inner_display() then return true end
+
+  local width, height = mode == 2 and 1280 or 720, mode == 2 and 720 or 1280
+  local flags = {}
+  local got_mode, _, _, current_flags = pcall(love.window.getMode)
+  if got_mode and type(current_flags) == 'table' then
+    for key, value in pairs(current_flags) do flags[key] = value end
+  end
+  flags.fullscreen = true
+  flags.fullscreentype = 'desktop'
+  flags.usedpiscale = true
+  flags.resizable = false
+
+  local ok, result = pcall(love.window.setMode, width, height, flags)
+  if not ok or result == false then
+    return false, tostring(result or 'Unable to set the Android window mode')
+  end
+
+  flags.resizable = true
+  ok, result = pcall(love.window.setMode, width, height, flags)
+  if not ok or result == false then
+    return false, tostring(result or 'Unable to enable Android orientation switching')
+  end
+  return true
+end
+
 --Capture the exact active run before rebuilding the scene after an orientation
 --or portrait-layout change. This mirrors the rollback system's proven save_run
 -- + copy_table sequence, but keeps the fresh snapshot queued as the normal run
@@ -1166,11 +1212,12 @@ end
 --path calls delete_run(), prep_stage(), creates new card areas/HUD/backdrop,
 --then restores every saved CardArea, tag, blind and game state. The settings
 --are already updated, so prep_stage/love.resize builds the new orientation.
-function portrait_restart_scene_for_layout_change()
+function portrait_restart_scene_for_layout_change(snapshot)
   if not G then return false, 'Game state is unavailable' end
 
   if G.STAGE == G.STAGES.RUN then
-    local snapshot, err = portrait_capture_run_for_layout_reload()
+    local err
+    if not snapshot then snapshot, err = portrait_capture_run_for_layout_reload() end
     if not snapshot then return false, err end
     G.FUNCS.start_run(nil, {
       savetext = snapshot,
@@ -1311,11 +1358,48 @@ end
 local portrait_game_update = Game.update
 function Game:update(dt)
   portrait_game_update(self, dt)
-  -- A Fold6 cover/inner transition changes both Android's system orientation
-  -- and the game's logical layout. Re-enter the same saved run once the new
-  -- surface size is stable so every CardArea, blind panel and HUD is created
-  -- against the final viewport rather than being moved in place.
+  -- A cover orientation change is asynchronous. Wait until Android has
+  -- delivered the target aspect ratio and the resize debounce has completed,
+  -- then rebuild the scene from the snapshot captured before requesting it.
+  local pending_layout = G.PORTRAIT_LAYOUT_RELOAD_PENDING
+  if pending_layout then
+    local w, h = love.graphics.getDimensions()
+    local target_reached = pending_layout.mode == 2 and w > h or pending_layout.mode ~= 2 and h > w
+    if target_reached and not G.PORTRAIT_RESIZE_PENDING then
+      if pending_layout.last_w == w and pending_layout.last_h == h then
+        pending_layout.stable_frames = (pending_layout.stable_frames or 0) + 1
+      else
+        pending_layout.last_w, pending_layout.last_h = w, h
+        pending_layout.stable_frames = 1
+      end
+    else
+      pending_layout.stable_frames = 0
+      pending_layout.last_w, pending_layout.last_h = w, h
+    end
+
+    if pending_layout.stable_frames >= 2 then
+      G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+      local ok, err = portrait_restart_scene_for_layout_change(pending_layout.snapshot)
+      if not ok then
+        G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
+        G:save_settings()
+        pcall(portrait_request_android_orientation, pending_layout.previous_mode)
+        print('PORTRAIT LAYOUT RELOAD ABORTED: ' .. tostring(err))
+      end
+    elseif love.timer.getTime() - pending_layout.started_at > 10 then
+      G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+      G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
+      G:save_settings()
+      pcall(portrait_request_android_orientation, pending_layout.previous_mode)
+      print('PORTRAIT ORIENTATION CHANGE TIMED OUT; previous mode restored')
+    end
+  end
+
+  -- A Fold6 cover/inner transition changes the Android configuration class.
+  -- Re-enter the same saved run after the new surface dimensions have settled.
   if G.PORTRAIT_FOLD_RELOAD_PENDING
+     and not G.PORTRAIT_LAYOUT_RELOAD_PENDING
+     and not G.PORTRAIT_RESIZE_PENDING
      and (G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU) then
     G.PORTRAIT_FOLD_RELOAD_PENDING = nil
     local ok, err = portrait_restart_scene_for_layout_change()
