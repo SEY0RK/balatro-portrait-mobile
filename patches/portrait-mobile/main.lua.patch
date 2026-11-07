@@ -939,7 +939,7 @@
  			end
  		end
  
-@@ -434,50 +814,190 @@
+@@ -434,51 +814,190 @@
  end
  
  function love.resize(w, h)
@@ -1105,7 +1105,7 @@
 +		G.ROOM_ATTACH.VT.w, G.ROOM_ATTACH.VT.h = G.ROOM_ATTACH.T.w, G.ROOM_ATTACH.T.h
 +	end
 +
-+ 	G.WINDOWTRANS = {
+ 	G.WINDOWTRANS = {
  		x = 0, y = 0,
 -		w = G.TILE_W+2*G.ROOM_PADDING_W, 
 -		h = G.TILE_H+3*G.ROOM_PADDING_H,
