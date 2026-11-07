@@ -891,9 +891,16 @@ function portrait_position_run_hud(hud)
           and hud and not hud.REMOVED and hud.T and hud.VT) then return end
 
   local x = G.ROOM.T.x + (G.ROOM.T.w - hud.T.w) / 2
-  hud.T.x, hud.VT.x = x, x
-  if hud.velocity then hud.velocity.x = 0 end
-  if hud.UIRoot and hud.UIRoot.initialize_VT then hud.UIRoot:initialize_VT() end
+  local changed = math.abs((hud.T.x or 0) - x) > 0.001
+      or math.abs((hud.VT.x or 0) - x) > 0.001
+  if changed then
+    hud.T.x, hud.VT.x = x, x
+    if hud.velocity then hud.velocity.x = 0 end
+    -- Re-sync the child UI tree only when the HUD's world position changes.
+    if hud.UIRoot and hud.UIRoot.initialize_VT then hud.UIRoot:initialize_VT() end
+  end
+  hud._portrait_position_passes = (hud._portrait_position_passes or 0) + 1
+  hud._portrait_position_last_x = x
 end
 
 -- Switching styles in a run
@@ -1480,6 +1487,12 @@ function Game:update(dt)
       ot.UIRoot.config.minw = math.max(ot.T.w, G.ROOM.T.w + 4)
       ot:recalculate()
     end
+  end
+
+  -- Final pass after the original update, resize handling and all portrait
+  -- layout work. Some late UI initialization paths can restore a stale x.
+  if G.F_PORTRAIT_LAYOUT and G.HUD and portrait_position_run_hud then
+    portrait_position_run_hud(G.HUD)
   end
 end
 
