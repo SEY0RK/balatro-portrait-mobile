@@ -1112,6 +1112,84 @@ function portrait_arrange_tags()
   end
 end
 
+--Capture the exact active run before rebuilding the scene after an orientation
+--or portrait-layout change. This mirrors the rollback system's proven save_run
+-- + copy_table sequence, but keeps the fresh snapshot queued as the normal run
+-- save as well, so a process exit during the transition cannot fall back to an
+-- older save.jkr.
+function portrait_capture_run_for_layout_reload()
+  if not (G and G.STAGE == G.STAGES.RUN and G.GAME and G.GAME.blind and G.GAME.selected_back) then
+    return nil, 'The current scene is not an active run'
+  end
+
+  G.ARGS = G.ARGS or {}
+  local previous_save = G.ARGS.save_run
+  local previous_culled = G.culled_table
+  G.ARGS.save_run = nil
+  G.culled_table = nil
+
+  local ok, snapshot = pcall(function()
+    save_run()
+    if type(G.ARGS.save_run) ~= 'table' then
+      error('save_run did not produce a fresh snapshot')
+    end
+
+    local saved = copy_table(G.ARGS.save_run)
+    if type(saved) ~= 'table'
+       or type(saved.GAME) ~= 'table'
+       or type(saved.cardAreas) ~= 'table'
+       or type(saved.BLIND) ~= 'table'
+       or type(saved.BACK) ~= 'table'
+       or saved.STATE == nil then
+      error('The active run snapshot is incomplete')
+    end
+    return saved
+  end)
+
+  if not ok or not snapshot then
+    G.ARGS.save_run = previous_save
+    G.culled_table = previous_culled
+    return nil, tostring(snapshot or 'Unable to capture the active run')
+  end
+
+  -- Keep the same fresh snapshot for the save thread and for start_run().
+  G.ARGS.save_run = snapshot
+  G.culled_table = snapshot
+  G.FILE_HANDLER = G.FILE_HANDLER or {}
+  G.FILE_HANDLER.run = true
+  G.FILE_HANDLER.update_queued = true
+  G.FILE_HANDLER.force = true
+  return snapshot
+end
+
+--Re-enter the active run through Balatro's native load-from-save path. That
+--path calls delete_run(), prep_stage(), creates new card areas/HUD/backdrop,
+--then restores every saved CardArea, tag, blind and game state. The settings
+--are already updated, so prep_stage/love.resize builds the new orientation.
+function portrait_restart_scene_for_layout_change()
+  if not G then return false, 'Game state is unavailable' end
+
+  if G.STAGE == G.STAGES.RUN then
+    local snapshot, err = portrait_capture_run_for_layout_reload()
+    if not snapshot then return false, err end
+    G.FUNCS.start_run(nil, {
+      savetext = snapshot,
+      from_portrait_layout = true
+    })
+    return true
+  end
+
+  if G.STAGE == G.STAGES.MAIN_MENU then
+    -- No in-memory run exists on the main menu. Recreate the menu scene using
+    -- the same transition as the vanilla Main Menu button; save.jkr is left
+    -- untouched so Continue remains available.
+    G.FUNCS.go_to_menu()
+    return true
+  end
+
+  return false, 'This screen cannot be safely rebuilt from an active run save'
+end
+
 --Resize and realign the felt/background sprite when the logical room changes
 --between portrait and the original landscape viewport. Its dimensions are
 --fixed when start_run creates it, so changing only ROOM.T left old black bands
