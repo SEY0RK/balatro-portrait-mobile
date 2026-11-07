@@ -455,6 +455,10 @@ function portrait_diagnostics_report()
             add("HUD box", "x=" .. fmt(G.HUD.T.x) .. " y=" .. fmt(G.HUD.T.y) .. " w=" .. fmt(G.HUD.T.w) .. " h=" .. fmt(G.HUD.T.h))
             add("HUD center", fmt(G.HUD.T.x + G.HUD.T.w/2) .. " / room " .. fmt(G.ROOM.T.x + G.ROOM.T.w/2))
             add("HUD role x", G.HUD.role and fmt(G.HUD.role.offset and G.HUD.role.offset.x) or "?")
+            local major = G.HUD.role and G.HUD.role.major
+            add("HUD anchor", major == G.ROOM_ATTACH and "ROOM_ATTACH" or major == G.ROOM and "ROOM_NODE" or major == G.HUD and "SELF" or "OTHER")
+            if major and major.T then add("HUD major rect", "x=" .. fmt(major.T.x) .. " w=" .. fmt(major.T.w)) end
+            add("HUD align", G.HUD.alignment and tostring(G.HUD.alignment.type) or "?")
         end
         add("Portrait", G.F_PORTRAIT_LAYOUT and "yes" or "no")
         add("Swipe only", G.F_SWIPE_ONLY and "yes" or "no")
