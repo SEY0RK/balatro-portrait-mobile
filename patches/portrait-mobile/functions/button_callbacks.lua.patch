@@ -263,7 +263,7 @@
    INIT_COLLECTION_CARD_ALERTS()
  end
  
-@@ -871,11 +857,128 @@
+@@ -871,11 +857,150 @@
  G.FUNCS.change_play_discard_position = function(args)
    G.SETTINGS.play_button_pos = args.to_key
    if G.buttons then
@@ -279,20 +279,41 @@
 +--Portrait layout style (Classic / One-Thumb / Focus, see portrait_layout).
 +--Applied on the spot: the HUD, blind panel, button bar and card areas are
 +--rebuilt in the new style (portrait_rebuild_HUD), mid-run too.
-+G.FUNCS.change_portrait_display_mode = function(args)
-+  G.SETTINGS.portrait_display_mode = args.to_key
++local function apply_portrait_setting_and_reload(setting_key, new_value)
++  local previous_value = G.SETTINGS[setting_key]
++  if previous_value == new_value then return end
++
++  G.SETTINGS[setting_key] = new_value
 +  G:save_settings()
-+  local w, h = love.graphics.getDimensions()
-+  love.resize(w, h)
-+  G.PORTRAIT_LAYOUT_PENDING_REFRESH = true
-+  portrait_apply_live_layout()
++
++  local ok, err = portrait_restart_scene_for_layout_change()
++  if not ok then
++    -- Never leave the game in a new display mode if its active run could not
++    -- be snapshotted. Restore the prior setting and keep the current scene.
++    G.SETTINGS[setting_key] = previous_value
++    G:save_settings()
++    local w, h = love.graphics.getDimensions()
++    love.resize(w, h)
++    print('PORTRAIT LAYOUT RELOAD ABORTED: ' .. tostring(err))
++    if attention_text then
++      attention_text({
++        scale = 0.55,
++        text = 'Layout change cancelled: run could not be saved',
++        hold = 2.5,
++        align = 'cm',
++        major = G.ROOM_ATTACH,
++        offset = {x = 0, y = 0}
++      })
++    end
++  end
++end
++
++G.FUNCS.change_portrait_display_mode = function(args)
++  apply_portrait_setting_and_reload('portrait_display_mode', args.to_key)
 +end
 +
 +G.FUNCS.change_portrait_layout = function(args)
-+  G.SETTINGS.portrait_layout = args.to_key
-+  G:save_settings()
-+  G.PORTRAIT_LAYOUT_PENDING_REFRESH = true
-+  if G.F_PORTRAIT_LAYOUT then portrait_apply_live_layout() end
++  apply_portrait_setting_and_reload('portrait_layout', args.to_key)
 +end
 +
 +--Frame rate: love.run works the cap out again on the next frame.
@@ -579,7 +600,7 @@
  end
  
  --Removes the overlay menu if one exists, unpauses the game, and saves the settings to file
-@@ -1416,7 +1577,7 @@
+@@ -1416,7 +1577,6 @@
    G.OVERLAY_MENU = nil
    G.VIEWING_DECK = nil
    G.SETTINGS.paused = false
@@ -587,7 +608,6 @@
  
    --Save settings to file
    G:save_settings()
-+  if portrait_flush_pending_layout_refresh then portrait_flush_pending_layout_refresh() end
 @@ -1492,13 +1652,6 @@
    }
  end
