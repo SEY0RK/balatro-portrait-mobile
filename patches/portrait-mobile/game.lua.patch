@@ -1448,7 +1448,7 @@
      G.SPLASH_BACK:set_alignment({
          major = G.play,
          type = 'cm',
-@@ -2611,15 +2469,43 @@
+@@ -2611,15 +2469,42 @@
      self.deck:hard_set_cards()
      
      self.HUD = UIBox{
@@ -1464,7 +1464,6 @@
      }
 +    if G.F_PORTRAIT_LAYOUT then
 +        self.HUD.T.y = 0.2
-+        self.HUD.T.x = (G.ROOM.T.w - self.HUD.T.w) / 2
 +    end
 +    
      self.HUD_blind = UIBox{
@@ -1494,11 +1493,14 @@
      G.hand_text_area = {
          chips = self.HUD:get_UIE_by_ID('hand_chips'),
          mult = self.HUD:get_UIE_by_ID('hand_mult'),
-@@ -2652,6 +2539,7 @@
+@@ -2652,6 +2539,10 @@
      G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
       
      self.HUD:recalculate()
-+    if G.F_PORTRAIT_LAYOUT then set_screen_positions() end
++    if G.F_PORTRAIT_LAYOUT then
++        if portrait_position_run_hud then portrait_position_run_hud(self.HUD) end
++        set_screen_positions()
++    end
  
      G.E_MANAGER:add_event(Event({
          trigger = 'immediate',
