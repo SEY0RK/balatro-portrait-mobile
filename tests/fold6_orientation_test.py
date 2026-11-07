@@ -18,7 +18,6 @@ BASE = """.class public Lorg/libsdl/app/SDLActivity;
     .locals 0
     return-void
 .end method
-.end class
 """
 
 
@@ -54,13 +53,11 @@ def main():
     assert result.count("balatroApplyFoldOrientation()V") == 2
 
     existing_callback = BASE.replace(
-        ".end class",
         """.method protected onConfigurationChanged(Landroid/content/res/Configuration;)V
     .locals 0
     invoke-super {p0, p1}, Landroid/app/Activity;->onConfigurationChanged(Landroid/content/res/Configuration;)V
     return-void
-.end method
-.end class""",
+.end method""",
     )
     existing_result = patch(existing_callback)
     assert existing_result.count(
