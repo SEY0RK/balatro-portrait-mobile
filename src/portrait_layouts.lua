@@ -1167,7 +1167,10 @@ function portrait_request_android_orientation(mode)
   flags.fullscreen = true
   flags.fullscreentype = 'desktop'
   flags.usedpiscale = true
-  flags.resizable = true
+  -- Keep the original fixed-window request. The patched SDLActivity selects
+  -- sensor portrait/landscape from width/height even when resizable is false.
+  -- A single setMode already reaches Android_CreateWindow -> setOrientation.
+  flags.resizable = false
 
   local started_at = love.timer.getTime()
   local ok, result = pcall(love.window.setMode, width, height, flags)
@@ -1204,7 +1207,10 @@ function portrait_capture_run_for_layout_reload()
       error('save_run did not produce a fresh snapshot')
     end
 
-    local saved = copy_table(G.ARGS.save_run)
+    -- save_run() has already produced a detached plain-data snapshot via
+    -- recursive_table_cull(). Copying it again duplicates the entire run tree
+    -- synchronously on the UI thread without adding snapshot isolation.
+    local saved = G.ARGS.save_run
     if type(saved) ~= 'table'
        or type(saved.GAME) ~= 'table'
        or type(saved.cardAreas) ~= 'table'
@@ -1260,6 +1266,7 @@ function portrait_restart_scene_for_layout_change(snapshot)
     })
     if metrics and metrics.active then
       metrics.restart_enqueue_ms = (love.timer.getTime() - queued_at) * 1000
+      metrics.pre_transition_ms = (love.timer.getTime() - metrics.started_at) * 1000
       metrics.start_run_queued_at = love.timer.getTime()
     end
     if not ok then return false, tostring(err) end
