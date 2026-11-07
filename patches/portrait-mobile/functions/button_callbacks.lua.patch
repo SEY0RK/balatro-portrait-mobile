@@ -263,7 +263,7 @@
    INIT_COLLECTION_CARD_ALERTS()
  end
  
-@@ -871,11 +857,126 @@
+@@ -871,11 +857,128 @@
  G.FUNCS.change_play_discard_position = function(args)
    G.SETTINGS.play_button_pos = args.to_key
    if G.buttons then
@@ -284,12 +284,14 @@
 +  G:save_settings()
 +  local w, h = love.graphics.getDimensions()
 +  love.resize(w, h)
++  G.PORTRAIT_LAYOUT_PENDING_REFRESH = true
 +  portrait_apply_live_layout()
 +end
 +
 +G.FUNCS.change_portrait_layout = function(args)
 +  G.SETTINGS.portrait_layout = args.to_key
 +  G:save_settings()
++  G.PORTRAIT_LAYOUT_PENDING_REFRESH = true
 +  if G.F_PORTRAIT_LAYOUT then portrait_apply_live_layout() end
 +end
 +
@@ -577,7 +579,7 @@
  end
  
  --Removes the overlay menu if one exists, unpauses the game, and saves the settings to file
-@@ -1416,7 +1577,6 @@
+@@ -1416,7 +1577,7 @@
    G.OVERLAY_MENU = nil
    G.VIEWING_DECK = nil
    G.SETTINGS.paused = false
@@ -585,6 +587,7 @@
  
    --Save settings to file
    G:save_settings()
++  if portrait_flush_pending_layout_refresh then portrait_flush_pending_layout_refresh() end
 @@ -1492,13 +1652,6 @@
    }
  end
