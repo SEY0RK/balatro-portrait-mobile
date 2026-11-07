@@ -235,7 +235,7 @@
 +    end
 +  end
 +
-+  local row_sizes = G.F_PORTRAIT and PORTRAIT_CONFIG.row_sizes or PORTRAIT_CONFIG.row_sizes_landscape
++  local row_sizes = G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.row_sizes or PORTRAIT_CONFIG.row_sizes_landscape
 +  local page = args.cycle_config.current_option
 +  local card_index = 1 + (page - 1) * 11
 +
@@ -263,7 +263,7 @@
    INIT_COLLECTION_CARD_ALERTS()
  end
  
-@@ -871,11 +857,123 @@
+@@ -871,11 +857,184 @@
  G.FUNCS.change_play_discard_position = function(args)
    G.SETTINGS.play_button_pos = args.to_key
    if G.buttons then
@@ -279,15 +279,88 @@
 +--Portrait layout style (Classic / One-Thumb / Focus, see portrait_layout).
 +--Applied on the spot: the HUD, blind panel, button bar and card areas are
 +--rebuilt in the new style (portrait_rebuild_HUD), mid-run too.
-+G.FUNCS.change_portrait_layout = function(args)
-+  G.SETTINGS.portrait_layout = args.to_key
-+  G:save_settings()
-+  if G.buttons then rebuild_buttons_uibox() end
-+  if G.F_PORTRAIT then
-+    portrait_rebuild_HUD()
-+    pcall(set_screen_positions)
-+    portrait_reflow_panels()
++local function apply_portrait_setting_and_reload(setting_key, new_value)
++  local previous_value = G.SETTINGS[setting_key]
++  if previous_value == new_value then return end
++
++  local track_display_switch = setting_key == 'portrait_display_mode'
++      and love.system.getOS() == 'Android'
++      and not portrait_fold6_is_inner_display()
++  if track_display_switch then
++    PORTRAIT_SWITCH_METRICS = {
++      active = true,
++      started_at = love.timer.getTime(),
++      target_mode = new_value
++    }
 +  end
++
++  -- Snapshot before asking Android to rotate. The window transition is
++  -- asynchronous, so the scene is only rebuilt after the target aspect ratio
++  -- has settled; the in-memory run must already be safe before that begins.
++  local snapshot
++  if G.STAGE == G.STAGES.RUN then
++    local err
++    snapshot, err = portrait_capture_run_for_layout_reload()
++    if not snapshot then
++      print('PORTRAIT LAYOUT CHANGE ABORTED: '..tostring(err))
++      if attention_text then attention_text({
++        scale = 0.55,
++        text = 'Layout change cancelled: run could not be saved',
++        hold = 2.5, align = 'cm', major = G.ROOM_ATTACH, offset = {x = 0, y = 0}
++      }) end
++      return
++    end
++  end
++
++  local settings_save_started_at = love.timer.getTime()
++  G.SETTINGS[setting_key] = new_value
++  G:save_settings()
++  if PORTRAIT_SWITCH_METRICS and PORTRAIT_SWITCH_METRICS.active then
++    PORTRAIT_SWITCH_METRICS.settings_save_ms = (love.timer.getTime() - settings_save_started_at) * 1000
++  end
++
++  if setting_key == 'portrait_display_mode'
++     and love.system.getOS() == 'Android'
++     and not portrait_fold6_is_inner_display() then
++    local ok, err = portrait_begin_android_layout_transition(snapshot, new_value, previous_value)
++    if not ok then
++      if PORTRAIT_SWITCH_METRICS then
++        PORTRAIT_SWITCH_METRICS.active = false
++        PORTRAIT_SWITCH_METRICS.failed_stage = 'wipe_start'
++        PORTRAIT_SWITCH_METRICS.failed_reason = tostring(err)
++      end
++      G.SETTINGS[setting_key] = previous_value
++      G.SETTINGS.paused = false
++      G:save_settings()
++      print('ANDROID ORIENTATION CHANGE ABORTED: '..tostring(err))
++    end
++    return
++  end
++
++  local ok, err = portrait_restart_scene_for_layout_change(snapshot)
++  if not ok then
++    G.SETTINGS[setting_key] = previous_value
++    G:save_settings()
++    print('PORTRAIT LAYOUT RELOAD ABORTED: ' .. tostring(err))
++    if attention_text then
++      attention_text({
++        scale = 0.55,
++        text = 'Layout change cancelled: run could not be saved',
++        hold = 2.5,
++        align = 'cm',
++        major = G.ROOM_ATTACH,
++        offset = {x = 0, y = 0}
++      })
++    end
++  end
++end
++
++G.FUNCS.change_portrait_display_mode = function(args)
++  apply_portrait_setting_and_reload('portrait_display_mode', args.to_key)
++end
++
++G.FUNCS.change_portrait_layout = function(args)
++  apply_portrait_setting_and_reload('portrait_layout', args.to_key)
 +end
 +
 +--Frame rate: love.run works the cap out again on the next frame.
@@ -325,7 +398,7 @@
 +  set_screen_positions()
 +
 +  -- 2. Update the LIVE alignment properties of the first tag
-+  if G.HUD_tags and G.HUD_tags[1] and G.F_PORTRAIT then
++  if G.HUD_tags and G.HUD_tags[1] and G.F_PORTRAIT_LAYOUT then
 +    -- Modify the actual active alignment type ('bl' or 'br')
 +    G.HUD_tags[1].alignment.type = (G.SETTINGS.play_main_hand == 1) and 'bl' or 'br'
 +    G.HUD_tags[1].alignment.offset.x = (G.SETTINGS.play_main_hand == 1) and -0.2  or 0.2
@@ -392,7 +465,7 @@
    end
  end
  
-@@ -953,28 +1051,29 @@
+@@ -953,28 +1112,29 @@
      args.current_position_text = ''
    end
  
@@ -443,7 +516,7 @@
    end
  end
  
-@@ -1002,9 +1101,29 @@
+@@ -1002,9 +1162,29 @@
  G.FUNCS.select_text_input = function(e)
    G.CONTROLLER.text_input_hook = e.children[1].children[1]
  
@@ -473,7 +546,7 @@
  end
  
  --Handles all key inputs for the hooked text input.
-@@ -1052,6 +1171,23 @@
+@@ -1052,6 +1232,23 @@
    --Start by setting the cursor position to the correct location
    TRANSPOSE_TEXT_INPUT(0)
  
@@ -497,7 +570,7 @@
    if string.len(text.ref_table[text.ref_value]) > 0 and args.key == 'BACKSPACE' then --If not at start, remove preceding letter
      MODIFY_TEXT_INPUT{
        letter = '',
-@@ -1077,6 +1213,7 @@
+@@ -1077,6 +1274,7 @@
      hook_config.colour[3] = G.C.WHITE[3]
      ease_colour(hook_config.colour, temp_colour)
      G.CONTROLLER.text_input_hook = nil
@@ -505,7 +578,7 @@
    elseif args.key == 'LEFT' then --Move cursor position to the left
      TRANSPOSE_TEXT_INPUT(-1)
    elseif args.key == 'RIGHT' then --Move cursor position to the right
-@@ -1224,11 +1361,16 @@
+@@ -1224,11 +1422,16 @@
      (G.SETTINGS.QUEUED_CHANGE and G.SETTINGS.QUEUED_CHANGE.screenmode == 'Windowed') and love.graphics.getWidth()*0.8 or G.SETTINGS.WINDOW.DISPLAYS[G.SETTINGS.WINDOW.selected_display].screen_res.w,
      (G.SETTINGS.QUEUED_CHANGE and G.SETTINGS.QUEUED_CHANGE.screenmode == 'Windowed') and love.graphics.getHeight()*0.8 or G.SETTINGS.WINDOW.DISPLAYS[G.SETTINGS.WINDOW.selected_display].screen_res.h,
      {fullscreen = G.SETTINGS.WINDOW.screenmode ~= 'Windowed',
@@ -527,13 +600,13 @@
      })
    G.SETTINGS.QUEUED_CHANGE = {}
    if _initial ~= true then
-@@ -1264,7 +1406,26 @@
+@@ -1264,7 +1467,26 @@
    if G.GAME.viewed_back.name ~= e.config.id then 
      --removes the UI from the previously selected back and adds the new one
  
 +    local mobile_ui = PORTRAIT_CONFIG and PORTRAIT_CONFIG.mobile_ui or {}
-+    local setup_back_desc_scale = G.F_PORTRAIT and (mobile_ui.run_setup_back_desc_scale or 0.72) or nil
-+    local setup_back_min_dims = G.F_PORTRAIT and (mobile_ui.run_setup_back_min_dims or 0.76) or nil
++    local setup_back_desc_scale = G.F_PORTRAIT_LAYOUT and (mobile_ui.run_setup_back_desc_scale or 0.72) or nil
++    local setup_back_min_dims = G.F_PORTRAIT_LAYOUT and (mobile_ui.run_setup_back_min_dims or 0.76) or nil
 +
      e.config.object:remove() 
 +    e.config.object = UIBox{
@@ -554,19 +627,19 @@
      e.config.object = UIBox{
        definition = G.GAME.viewed_back:generate_UI(),
        config = {offset = {x=0,y=0}, align = 'cm', parent = e}
-@@ -1360,6 +1521,7 @@
+@@ -1360,6 +1582,7 @@
        config = {offset = {x=0,y=0}, parent = tab_contents, type = 'cm'}
      }
    tab_contents.UIBox:recalculate()
-+  if G.F_PORTRAIT and tab_contents.UIBox == G.OVERLAY_MENU then portrait_fit_overlay(G.OVERLAY_MENU) end
++  if G.F_PORTRAIT_LAYOUT and tab_contents.UIBox == G.OVERLAY_MENU then portrait_fit_overlay(G.OVERLAY_MENU) end
  end
  
  --||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-@@ -1400,10 +1562,9 @@
+@@ -1400,10 +1623,9 @@
  
    --Set the offset and align. The menu overlay can be initially offset in the y direction and this will ensure it slides to middle
    G.OVERLAY_MENU.alignment.offset.y = 0
-+  if G.F_PORTRAIT then portrait_fit_overlay(G.OVERLAY_MENU) end
++  if G.F_PORTRAIT_LAYOUT then portrait_fit_overlay(G.OVERLAY_MENU) end
    G.ROOM.jiggle = G.ROOM.jiggle + 1
    G.OVERLAY_MENU:align_to_major()
 -
@@ -574,7 +647,7 @@
  end
  
  --Removes the overlay menu if one exists, unpauses the game, and saves the settings to file
-@@ -1416,7 +1577,6 @@
+@@ -1416,7 +1638,6 @@
    G.OVERLAY_MENU = nil
    G.VIEWING_DECK = nil
    G.SETTINGS.paused = false
@@ -582,7 +655,7 @@
  
    --Save settings to file
    G:save_settings()
-@@ -1492,13 +1652,6 @@
+@@ -1492,13 +1713,6 @@
    }
  end
  
@@ -596,7 +669,7 @@
  G.FUNCS.your_collection = function(e)
    G.SETTINGS.paused = true
    G.FUNCS.overlay_menu{
-@@ -1626,22 +1779,6 @@
+@@ -1626,22 +1840,6 @@
    }
  end
  
@@ -619,7 +692,7 @@
  G.FUNCS.setup_run = function(e)
    G.SETTINGS.paused = true
    G.FUNCS.overlay_menu{
-@@ -1738,7 +1875,7 @@
+@@ -1738,7 +1936,7 @@
    G.focused_profile = G.SETTINGS.profile
  
    for i = 1, 3 do
@@ -628,7 +701,7 @@
    end
    G:load_profile(G.focused_profile)
  
-@@ -1801,10 +1938,6 @@
+@@ -1801,10 +1999,6 @@
    love.system.openURL( "https://www.playbalatro.com" )
  end
  
@@ -639,7 +712,7 @@
  G.FUNCS.go_to_discord = function(e)
    love.system.openURL( "https://discord.gg/balatro" )
  end
-@@ -1813,14 +1946,6 @@
+@@ -1813,14 +2007,6 @@
    love.system.openURL( "https://discord.com/channels/1116389027176787968/1207803392978853898" )
  end
  
@@ -654,7 +727,7 @@
  G.FUNCS.loc_survey = function(e)
    love.system.openURL( "https://forms.gle/pL5tMh1oXLmv8czz9" )
  end
-@@ -1853,22 +1978,6 @@
+@@ -1853,22 +2039,6 @@
    end
  end
  
@@ -677,7 +750,7 @@
  G.FUNCS.warn_lang = function(e)
    local _infotip_object = G.OVERLAY_MENU:get_UIE_by_ID('overlay_menu_infotip')
    if (_infotip_object.config.set ~= e.config.ref_table.label) and (not G.F_NO_ACHIEVEMENTS) then 
-@@ -1921,7 +2030,28 @@
+@@ -1921,7 +2091,28 @@
      G.CLIPBOARD = G.GAME.pseudorandom.seed
    else
      love.system.setClipboardText(G.GAME.pseudorandom.seed)
@@ -707,7 +780,7 @@
  end
  
  G.FUNCS.start_setup_run = function(e)
-@@ -1942,7 +2072,7 @@
+@@ -1942,7 +2133,7 @@
  
    elseif G.SETTINGS.current_setup == 'Continue' then
      if G.SAVED_GAME ~= nil then
@@ -716,23 +789,23 @@
      end
    end
  end
-@@ -1957,18 +2087,32 @@
+@@ -1957,18 +2148,32 @@
      e.config.object:remove()
      e.config.object = nil
    elseif not e.config.object and G.run_setup_seed then
 +    -- Portrait: this row was built for a mouse. The field, the paste button and
 +    -- the note beside them were too small to hit or read on a phone (#44).
-+    local seed_note_scale = G.F_PORTRAIT and 0.34 or 0.26
-+    local seed_field_w = G.F_PORTRAIT and 3.1 or 2.5
-+    local seed_field_h = G.F_PORTRAIT and 1.0 or 0.7
-+    local seed_text_scale = G.F_PORTRAIT and 0.5 or 0.4
-+    local paste_w = G.F_PORTRAIT and 1.7 or 1
-+    local paste_h = G.F_PORTRAIT and 1.0 or 0.6
-+    local paste_scale = G.F_PORTRAIT and 0.4 or 0.3
++    local seed_note_scale = G.F_PORTRAIT_LAYOUT and 0.34 or 0.26
++    local seed_field_w = G.F_PORTRAIT_LAYOUT and 3.1 or 2.5
++    local seed_field_h = G.F_PORTRAIT_LAYOUT and 1.0 or 0.7
++    local seed_text_scale = G.F_PORTRAIT_LAYOUT and 0.5 or 0.4
++    local paste_w = G.F_PORTRAIT_LAYOUT and 1.7 or 1
++    local paste_h = G.F_PORTRAIT_LAYOUT and 1.0 or 0.6
++    local paste_scale = G.F_PORTRAIT_LAYOUT and 0.4 or 0.3
 +    -- The columns either side of the field are desktop breathing room; on a phone
 +    -- they push the row past the panel and cut the note off at the screen edge.
-+    local seed_note_w = G.F_PORTRAIT and 2.2 or 2.5
-+    local seed_tail_w = G.F_PORTRAIT and 0.2 or 2.5
++    local seed_note_w = G.F_PORTRAIT_LAYOUT and 2.2 or 2.5
++    local seed_tail_w = G.F_PORTRAIT_LAYOUT and 0.2 or 2.5
 +
      e.config.object = UIBox{
        definition = {n=G.UIT.ROOT, config={align = "cm", colour = G.C.CLEAR}, nodes={
@@ -754,7 +827,7 @@
          }},
        }},
        config = {offset = {x=0,y=0}, parent = e, type = 'cm'}
-@@ -2126,6 +2270,12 @@
+@@ -2126,6 +2331,12 @@
        else
          _F.intensity = 0
        end
@@ -767,7 +840,7 @@
  
        _F.timer = _F.timer + G.real_dt*(1 + _F.intensity*0.2)
        if _F.intensity_vel < 0 then _F.intensity_vel = _F.intensity_vel*(1 - 10*G.real_dt) end
-@@ -2212,7 +2362,7 @@
+@@ -2212,7 +2423,7 @@
      end
    end
  
@@ -776,7 +849,7 @@
      if e.config.ref_table.ability.set ~= 'Joker' or (e.config.ref_table.edition and e.config.ref_table.edition.negative) or #G.jokers.cards < G.jokers.config.card_limit then 
          e.config.colour = G.C.GREEN
          e.config.button = 'use_card'
-@@ -2222,13 +2372,6 @@
+@@ -2222,13 +2433,6 @@
      end
    end
  
@@ -790,7 +863,7 @@
    G.FUNCS.can_sell_card = function(e)
      if e.config.ref_table:can_sell_card() then 
          e.config.colour = G.C.GREEN
-@@ -2240,7 +2383,7 @@
+@@ -2240,7 +2444,7 @@
    end
  
    G.FUNCS.can_skip_booster = function(e)
@@ -799,7 +872,7 @@
      (G.STATE == G.STATES.PLANET_PACK or G.STATE == G.STATES.STANDARD_PACK or G.STATE == G.STATES.BUFFOON_PACK or (G.hand and (G.hand.cards[1] or (G.hand.config.card_limit <= 0)))) then 
          e.config.colour = G.C.GREY
          e.config.button = 'skip_booster'
-@@ -2252,11 +2395,22 @@
+@@ -2252,11 +2456,22 @@
  
    G.FUNCS.show_infotip = function(e)
      if e.config.ref_table then 
@@ -823,7 +896,7 @@
        e.config.ref_table = nil
      end
    end
-@@ -2449,6 +2603,7 @@
+@@ -2449,6 +2664,7 @@
      G.SETTINGS.COMP.submission_name = true
      if G.MAIN_MENU_UI then G.MAIN_MENU_UI:remove() end
      if G.PROFILE_BUTTON then G.PROFILE_BUTTON:remove() end
@@ -831,7 +904,7 @@
      set_main_menu_UI()
      G:save_progress()
      G.FILE_HANDLER.force = true
-@@ -2458,6 +2613,7 @@
+@@ -2458,6 +2674,7 @@
      G.SETTINGS.COMP.name = ''
      if G.MAIN_MENU_UI then G.MAIN_MENU_UI:remove() end
      if G.PROFILE_BUTTON then G.PROFILE_BUTTON:remove() end
@@ -839,45 +912,45 @@
      set_main_menu_UI()
    end
  
-@@ -2739,10 +2895,14 @@
+@@ -2739,10 +2956,14 @@
    end
  
    G.FUNCS.blind_choice_handler = function(e)
 -    if not e.config.ref_table.run_info and G.blind_select and G.blind_select.VT.y < 10 and e.config.id and G.blind_select_opts[string.lower(e.config.id)] then 
 -      if e.UIBox.role.xy_bond ~= 'Weak' then e.UIBox:set_role({xy_bond = 'Weak'}) end
 +    -- Dynamic Y-limit to account for Portrait mode's lower UI placement
-+    local y_limit = G.F_PORTRAIT and 50 or 10
++    local y_limit = G.F_PORTRAIT_LAYOUT and 50 or 10
 +
 +    if not e.config.ref_table.run_info and G.blind_select and G.blind_select.VT.y < y_limit and e.config.id and G.blind_select_opts[string.lower(e.config.id)] then
 +      -- Portrait: skip xy_bond change to keep blind cards locked in row layout (prevents fly-away)
-+      if not G.F_PORTRAIT and e.UIBox.role.xy_bond ~= 'Weak' then e.UIBox:set_role({xy_bond = 'Weak'}) end
++      if not G.F_PORTRAIT_LAYOUT and e.UIBox.role.xy_bond ~= 'Weak' then e.UIBox:set_role({xy_bond = 'Weak'}) end
        if (e.config.ref_table.deck ~= 'on' and e.config.id == G.GAME.blind_on_deck) or
 -         (e.config.ref_table.deck ~= 'off' and e.config.id ~= G.GAME.blind_on_deck) then
 +        (e.config.ref_table.deck ~= 'off' and e.config.id ~= G.GAME.blind_on_deck) then
  
            local _blind_choice = G.blind_select_opts[string.lower(e.config.id)]
            local _top_button = e.UIBox:get_UIE_by_ID('select_blind_button')
-@@ -2759,7 +2919,11 @@
+@@ -2759,7 +2980,11 @@
              _border.parent.config.outline_colour = G.C.UI.TRANSPARENT_DARK
              _border.config.outline_colour = _border.config.outline and _border.config.outline_colour or get_blind_main_colour(e.config.id)
              _border.config.outline = 1.5
 -            _blind_choice.alignment.offset.y = -0.9
 +            
 +            -- Elevates the active blind visually (portrait: no y-shift to prevent row drift)
-+            local y_offset_active = G.F_PORTRAIT and 0 or -0.9
-+            if not G.F_PORTRAIT then _blind_choice.alignment.offset.y = y_offset_active end
++            local y_offset_active = G.F_PORTRAIT_LAYOUT and 0 or -0.9
++            if not G.F_PORTRAIT_LAYOUT then _blind_choice.alignment.offset.y = y_offset_active end
 +            
              if _tag and _tag_container then 
                _tag_container.children[2].config.draw_after = false
                _tag_container.children[2].config.colour = G.C.BLACK
-@@ -2788,16 +2952,23 @@
+@@ -2788,16 +3013,23 @@
              _border.parent.config.outline_colour = nil
              _border.config.outline_colour = nil
              _border.config.outline = nil
 -            _blind_choice.alignment.offset.y = -0.2
 +            
 +            -- Pushes inactive blinds down visually (portrait: no y-shift to prevent row drift)
-+            local y_offset_inactive = G.F_PORTRAIT and 0 or -0.2
++            local y_offset_inactive = G.F_PORTRAIT_LAYOUT and 0 or -0.2
 +            _blind_choice.alignment.offset.y = y_offset_inactive
 +            
              if _tag and _tag_container then 
@@ -901,12 +974,12 @@
                  _blind_choice.children.alert = UIBox{
                    definition = create_UIBox_card_alert({text_rot = -0.35, no_bg = true,text = localize('k_skipped_cap'), bump_amount = 1, scale = 0.9, maxw = 3.4}),
                    config = {
-@@ -2830,9 +3001,11 @@
+@@ -2830,9 +3062,11 @@
      if (e.states.hover.is or e.parent.states.hover.is) and (e.created_on_pause == G.SETTINGS.paused) and
        not e.parent.children.alert then
          local _sprite = e.config.ref_table:get_uibox_table()
 +        local popup_align = 'tm'
-+        local popup_offset = {x = 0, y = G.F_PORTRAIT and -0.45 or -0.1}
++        local popup_offset = {x = 0, y = G.F_PORTRAIT_LAYOUT and -0.45 or -0.1}
          e.parent.children.alert = UIBox{
            definition = G.UIDEF.card_h_popup(_sprite),
 -          config = {align="tm", offset = {x = 0, y = -0.1},
@@ -914,7 +987,7 @@
            major = e.parent,
            instance_type = 'POPUP'},
        }
-@@ -2840,6 +3013,7 @@
+@@ -2840,6 +3074,7 @@
        play_sound('paper1', math.random()*0.1 + 0.55, 0.42)
        play_sound('tarot2', math.random()*0.1 + 0.55, 0.09)
        e.parent.children.alert.states.collide.can = false
@@ -922,14 +995,14 @@
      elseif e.parent.children.alert and
      ((not e.states.collide.is and not e.parent.states.collide.is) or (e.created_on_pause ~= G.SETTINGS.paused)) then
        e.parent.children.alert:remove()
-@@ -2917,35 +3091,65 @@
+@@ -2917,35 +3152,65 @@
          trigger = 'immediate',
          func = function()
            play_sound('other1')
 -          G.blind_select_opts.boss:set_role({xy_bond = 'Weak'})
 -          G.blind_select_opts.boss.alignment.offset.y = 20
 +          -- Portrait: skip slide-out animation to prevent layout drift
-+          if not G.F_PORTRAIT then
++          if not G.F_PORTRAIT_LAYOUT then
 +            G.blind_select_opts.boss:set_role({xy_bond = 'Weak'})
 +            G.blind_select_opts.boss.alignment.offset.y = 20
 +          end
@@ -939,7 +1012,7 @@
      G.E_MANAGER:add_event(Event({
        trigger = 'after',
 -      delay = 0.3,
-+      delay = G.F_PORTRAIT and 0.05 or 0.3,
++      delay = G.F_PORTRAIT_LAYOUT and 0.05 or 0.3,
        func = (function()
          local par = G.blind_select_opts.boss.parent
          G.GAME.round_resets.blind_choices.Boss = get_new_boss()
@@ -967,9 +1040,9 @@
            definition =
              {n=G.UIT.ROOT, config={align = "cm", colour = G.C.CLEAR}, nodes={
 -              UIBox_dyn_container({create_UIBox_blind_choice('Boss')},false,get_blind_main_colour('Boss'), mix_colours(G.C.BLACK, get_blind_main_colour('Boss'), 0.8))
-+              {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT and (mobile_blind.wrapper_pad or 0.012) or 0.03, colour = G.C.UI.TRANSPARENT_DARK, r=0.1}, nodes={
-+                {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04, colour = boss_main_colour, r=0.1}, nodes={
-+                  {n=G.UIT.R, config = {align = "tm", colour = boss_bg_colour, r=0.1, padding = G.F_PORTRAIT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04}, nodes={
++              {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT_LAYOUT and (mobile_blind.wrapper_pad or 0.012) or 0.03, colour = G.C.UI.TRANSPARENT_DARK, r=0.1}, nodes={
++                {n=G.UIT.R, config = {align = "cm", padding = G.F_PORTRAIT_LAYOUT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04, colour = boss_main_colour, r=0.1}, nodes={
++                  {n=G.UIT.R, config = {align = "tm", colour = boss_bg_colour, r=0.1, padding = G.F_PORTRAIT_LAYOUT and (mobile_blind.wrapper_inner_pad or 0.018) or 0.04}, nodes={
 +                    create_UIBox_blind_choice('Boss')
 +                  }}
 +                }}
@@ -977,17 +1050,17 @@
              }},
            config = {align="bmi",
 -                    offset = {x=0,y=G.ROOM.T.y + 9},
-+                    offset = {x=0,y=G.F_PORTRAIT and 0 or (G.ROOM.T.y + 9)},
++                    offset = {x=0,y=G.F_PORTRAIT_LAYOUT and 0 or (G.ROOM.T.y + 9)},
                      major = par,
 -                    xy_bond = 'Weak'
-+                    xy_bond = G.F_PORTRAIT and 'Strong' or 'Weak'
++                    xy_bond = G.F_PORTRAIT_LAYOUT and 'Strong' or 'Weak'
                    }
          }
          par.config.object = G.blind_select_opts.boss
          par.config.object:recalculate()
          G.blind_select_opts.boss.parent = par
          G.blind_select_opts.boss.alignment.offset.y = 0
-+        if G.F_PORTRAIT then
++        if G.F_PORTRAIT_LAYOUT then
 +            -- Force-snap to the row slot so it doesn't render at its initial T.
 +            G.blind_select_opts.boss:align_to_major()
 +            G.blind_select_opts.boss:hard_set_VT()
@@ -995,7 +1068,7 @@
          
          G.E_MANAGER:add_event(Event({blocking = false, trigger = 'after', delay = 0.5,func = function()
              G.CONTROLLER.locks.boss_reroll = nil
-@@ -3054,7 +3258,6 @@
+@@ -3054,7 +3319,6 @@
          }))
          play_sound("coin7")
          G.VIBRATION = G.VIBRATION + 1
@@ -1003,7 +1076,7 @@
        end
        ease_chips(0)
        if G.GAME.round_resets.blind_states.Boss == 'Defeated' then 
-@@ -3312,3 +3515,43 @@
+@@ -3312,3 +3576,43 @@
      end
    }))
  end

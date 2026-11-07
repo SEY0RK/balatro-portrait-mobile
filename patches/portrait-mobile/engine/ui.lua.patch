@@ -178,7 +178,7 @@
  end
  
 +function UIBox:fit_to_room()
-+    if not (G and G.F_PORTRAIT and G.ROOM and G.ROOM.T and self.config and self.config.fit_to_room) then return end
++    if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and self.config and self.config.fit_to_room) then return end
 +
 +    local dx, dy = 0, 0
 +    if get_portrait_room_fit_delta then

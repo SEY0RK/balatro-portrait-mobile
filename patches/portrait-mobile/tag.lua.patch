@@ -15,7 +15,7 @@
 -                _self.config.h_popup_config ={align = 'cl', offset = {x=-0.1,y=0},parent = _self}
 +                
 +                -- Sets dynamic popup alignment based on screen orientation and hand setting
-+                if G.F_PORTRAIT and get_portrait_top_popup_config then
++                if G.F_PORTRAIT_LAYOUT and get_portrait_top_popup_config then
 +                    -- Edge-aware: pulls the tooltip back on-screen when the tag
 +                    -- sits near the left/right edge instead of overflowing.
 +                    _self.config.h_popup_config = get_portrait_top_popup_config(_self)
@@ -38,7 +38,7 @@
 +    local _tag_sprite_move = tag_sprite.move
 +    tag_sprite.move = function(_self, dt)
 +        _tag_sprite_move(_self, dt)
-+        if G.F_PORTRAIT and _self.children and _self.children.h_popup and prepare_portrait_popup_fit then
++        if G.F_PORTRAIT_LAYOUT and _self.children and _self.children.h_popup and prepare_portrait_popup_fit then
 +            prepare_portrait_popup_fit(_self.children.h_popup)
 +        end
 +    end
@@ -54,7 +54,7 @@
 -                offset = {x=0.7,y=0},
 -                xy_bond = 'Weak',
 -                major = G.ROOM_ATTACH})
-+                if G.F_PORTRAIT then
++                if G.F_PORTRAIT_LAYOUT then
 +                    local first_tag_align, first_tag_offset = get_portrait_first_tag_align()
 +                    G.HUD_tags[HUD_tag_key+1]:set_alignment({type = first_tag_align,
 +                    offset = first_tag_offset,
@@ -73,5 +73,5 @@
      end
  
      self.HUD_tag:remove()
-+    if G.F_PORTRAIT then portrait_arrange_tags() end
++    if G.F_PORTRAIT_LAYOUT then portrait_arrange_tags() end
  end

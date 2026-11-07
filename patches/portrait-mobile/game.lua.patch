@@ -1337,7 +1337,7 @@
  
 -    
 +    local SC_scale_splash = 13*SC_scale
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        SC_scale_splash = 10*SC_scale
 +    end
 +
@@ -1354,7 +1354,7 @@
      G.SPLASH_LOGO.dissolve = 1   
  
 +    local mult = 1.2
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        mult = 0.9
 +    end
  
@@ -1394,7 +1394,7 @@
  
 +    local align_version = "tri"
 +    local offset_version = 0
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        align_version = "tli"
 +        offset_version = 0.6
 +    end
@@ -1448,24 +1448,22 @@
      G.SPLASH_BACK:set_alignment({
          major = G.play,
          type = 'cm',
-@@ -2611,15 +2469,44 @@
+@@ -2611,15 +2469,42 @@
      self.deck:hard_set_cards()
      
      self.HUD = UIBox{
 -        definition = create_UIBox_HUD(),
 -        config = {align=('cli'), offset = {x=-0.7,y=0},major = G.ROOM_ATTACH}
-+        definition = (G.F_PORTRAIT and create_UIBox_HUD_vertical() or create_UIBox_HUD()), 
++        definition = (G.F_PORTRAIT_LAYOUT and create_UIBox_HUD_vertical() or create_UIBox_HUD()), 
 +        config = {
-+            align = (G.F_PORTRAIT and 'tm' or 'cli'), 
-+            offset = (G.F_PORTRAIT and {x=0, y=0} or {x=-0.7, y=0}), 
-+            major = (G.F_PORTRAIT and G.ROOM or G.ROOM_ATTACH)
++            align = (G.F_PORTRAIT_LAYOUT and 'tm' or 'cli'), 
++            offset = (G.F_PORTRAIT_LAYOUT and {x=0, y=0} or {x=-0.7, y=0}), 
++            -- Portrait keeps its original ROOM anchor and direct room-based centering.
++            major = (G.F_PORTRAIT_LAYOUT and G.ROOM or G.ROOM_ATTACH)
 +        }
      }
-+    
-+    -- Portrait: Force HUD to TOP of screen
-+    if G.F_PORTRAIT then
-+        self.HUD.T.y = 0.2  -- Little margin - HUD at top
-+        self.HUD.T.x = (G.ROOM.T.w - self.HUD.T.w) / 2
++    if G.F_PORTRAIT_LAYOUT then
++        self.HUD.T.y = 0.2
 +    end
 +    
      self.HUD_blind = UIBox{
@@ -1482,7 +1480,7 @@
 +    if _hb_d2 then _hb_d2.config.func = 'portrait_HUD_blind_debuff' end
      self.HUD_tags = {}
  
-+    if G.F_PORTRAIT and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
++    if G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
 +        if self.hand_preview then self.hand_preview:remove(); self.hand_preview = nil end
 +        self.hand_preview = UIBox{
 +            definition = create_UIBox_hand_preview(),
@@ -1495,12 +1493,14 @@
      G.hand_text_area = {
          chips = self.HUD:get_UIE_by_ID('hand_chips'),
          mult = self.HUD:get_UIE_by_ID('hand_mult'),
-@@ -2652,6 +2539,8 @@
+@@ -2652,6 +2539,10 @@
      G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
       
      self.HUD:recalculate()
-+    -- The shelves of the non-classic layouts start under the HUD just built.
-+    if G.F_PORTRAIT then set_screen_positions() end
++    if G.F_PORTRAIT_LAYOUT then
++        if portrait_position_run_hud then portrait_position_run_hud(self.HUD) end
++        set_screen_positions()
++    end
  
      G.E_MANAGER:add_event(Event({
          trigger = 'immediate',
@@ -1822,16 +1822,20 @@
          G.SHADERS['CRT']:send('crt_intensity', 0.16*G.SETTINGS.GRAPHICS.crt/100)
          G.SHADERS['CRT']:send('glitch_intensity', 0)--0.1*G.SETTINGS.GRAPHICS.crt/100 + (G.screenwipe_amt) + 1)
          G.SHADERS['CRT']:send('scanlines', G.CANVAS:getPixelHeight()*0.75/G.CANV_SCALE)
-@@ -3305,7 +3059,7 @@
+@@ -3305,7 +3059,12 @@
          love.graphics.setShader( G.SHADERS['CRT'])
          G.SETTINGS.GRAPHICS.crt = G.SETTINGS.GRAPHICS.crt/0.3
      end
--        love.graphics.scale(1/G.CANV_SCALE)
+         love.graphics.scale(1/G.CANV_SCALE)
 +
++        if G.F_ROTATED_LANDSCAPE and not G.AA_CANVAS then
++            love.graphics.translate(G.PORTRAIT_SCREEN_W or love.graphics.getWidth(), 0)
++            love.graphics.rotate(math.pi/2)
++        end
          love.graphics.draw(self.CANVAS, 0, 0)
      love.graphics.pop()
  
-@@ -3321,20 +3075,12 @@
+@@ -3321,20 +3079,12 @@
  
      timer_checkpoint('canvas', 'draw')
  
@@ -1853,7 +1857,7 @@
          if G.check and G.SETTINGS.perf_mode then
              local section_h = 30
              local resolution = 60*section_h
-@@ -3370,7 +3116,7 @@
+@@ -3370,7 +3120,7 @@
  
  function Game:update_selecting_hand(dt)
      if not self.deck_preview and not G.OVERLAY_MENU and (
@@ -1862,7 +1866,7 @@
          G.CONTROLLER.held_buttons.triggerleft) then
          if self.buttons then
              self.buttons.states.visible = false
-@@ -3405,10 +3151,7 @@
+@@ -3405,10 +3155,7 @@
          }))
      end
      if not self.buttons and not self.deck_preview then
@@ -1874,7 +1878,7 @@
      end
      if self.buttons and not self.buttons.states.visible and not self.deck_preview then
          self.buttons.states.visible = true
-@@ -3433,6 +3176,18 @@
+@@ -3433,6 +3180,18 @@
  function Game:update_shop(dt)
      if not G.STATE_COMPLETE then
          stop_use()
@@ -1883,7 +1887,7 @@
 +        --no cards are mid-animation and the shop UI hasn't been built yet, so
 +        --everything below picks up the new scale/layout. The next hand then
 +        --starts in the new mode without restarting the run.
-+        if G.F_PORTRAIT and G.F_SWIPE_ONLY ~= (not not G.SETTINGS.swipe_only_mode) then
++        if G.F_PORTRAIT_LAYOUT and G.F_SWIPE_ONLY ~= (not not G.SETTINGS.swipe_only_mode) then
 +            G.F_SWIPE_ONLY = not not G.SETTINGS.swipe_only_mode
 +            pcall(function() love.resize(love.graphics.getDimensions()) end)
 +            if G.HUD and G.ROOM then G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w)/2 end
@@ -1893,7 +1897,7 @@
          ease_background_colour_blind(G.STATES.SHOP)
          local shop_exists = not not G.shop
          G.shop = G.shop or UIBox{
-@@ -3441,7 +3196,8 @@
+@@ -3441,7 +3200,8 @@
          }
              G.E_MANAGER:add_event(Event({
                  func = function()
@@ -1903,7 +1907,7 @@
                      G.shop.alignment.offset.x = 0
                      G.E_MANAGER:add_event(Event({
                          trigger = 'after',
-@@ -3473,9 +3229,7 @@
+@@ -3473,9 +3233,7 @@
                                              G.shop_jokers:emplace(create_card_for_shop(G.shop_jokers))
                                          end
                                      end
@@ -1914,29 +1918,29 @@
                                      if G.load_shop_vouchers then 
                                          nosave_shop = true
                                          G.shop_vouchers:load(G.load_shop_vouchers)
-@@ -3646,7 +3400,9 @@
+@@ -3646,7 +3404,9 @@
                      definition = create_UIBox_blind_select(),
                      config = {align="bmi", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
                  }
 -                G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
-+                G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - (G.F_PORTRAIT and PORTRAIT_CONFIG.jokers_y or G.jokers.T.y)) + G.blind_select.T.h
++                G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - (G.F_PORTRAIT_LAYOUT and PORTRAIT_CONFIG.jokers_y or G.jokers.T.y)) + G.blind_select.T.h
 +                -- Portrait: kept between the joker shelf and the screen's bottom.
-+                if G.F_PORTRAIT then G.blind_select.alignment.offset.y = portrait_blind_select_offset() end
++                if G.F_PORTRAIT_LAYOUT then G.blind_select.alignment.offset.y = portrait_blind_select_offset() end
                  G.ROOM.jiggle = G.ROOM.jiggle + 3
                  G.blind_select.alignment.offset.x = 0
                  G.CONTROLLER.lock_input = false
-@@ -3675,16 +3431,35 @@
+@@ -3675,16 +3435,35 @@
                  G.GAME.facing_blind = nil
                  save_run()
                  ease_background_colour_blind(G.STATES.ROUND_EVAL)
-+                local round_eval_align = G.F_PORTRAIT and "b" or "bm"
++                local round_eval_align = G.F_PORTRAIT_LAYOUT and "b" or "bm"
                  G.round_eval = UIBox{
                      definition = create_UIBox_round_evaluation(),
 -                    config = {align="bm", offset = {x=0,y=G.ROOM.T.y + 19},major = G.hand, bond = 'Weak'}
 +                    config = {align=round_eval_align, offset = {x=0,y=G.ROOM.T.y + 19},major = G.hand, bond = 'Weak'}
                  }
                  G.round_eval.alignment.offset.x = 0
-+                if G.F_PORTRAIT and G.ROOM and G.ROOM.T then
++                if G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T then
 +                    local x = (G.ROOM.T.w - G.round_eval.T.w)/2
 +                    if G.round_eval.role and G.round_eval.role.offset and G.round_eval.role.major then
 +                        local major = G.round_eval.role.major:get_major()
@@ -1964,7 +1968,7 @@
                          else
                              if math.abs(G.round_eval.T.y - G.round_eval.VT.y) < 3 then
                                      G.ROOM.jiggle = G.ROOM.jiggle + 3
-@@ -3990,23 +3765,3 @@
+@@ -3990,23 +3769,3 @@
  
  function Game:update_menu(dt)
  end

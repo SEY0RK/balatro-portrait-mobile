@@ -141,7 +141,7 @@
 +        local big_blind_tutorial_ready = G.STATE == G.STATES.BLIND_SELECT and G.blind_select and
 +            not G.SETTINGS.tutorial_progress.completed_parts['big_blind'] and
 +            (G.GAME.round > 0 or G.SETTINGS.tutorial_progress.completed_parts['shop_1']) and
-+            (not G.F_PORTRAIT or (G.blind_select_opts and G.blind_select_opts.big and G.blind_select_opts.boss))
++            (not G.F_PORTRAIT_LAYOUT or (G.blind_select_opts and G.blind_select_opts.big and G.blind_select_opts.boss))
 +        if big_blind_tutorial_ready then
              G.SETTINGS.tutorial_progress.section = 'big_blind'
              G.FUNCS.tutorial_part('big_blind')
@@ -161,8 +161,8 @@
          end
 -         if G.STATE == G.STATES.SHOP and G.shop and G.shop.VT.y < 5 and not G.SETTINGS.tutorial_progress.completed_parts['shop_1'] then
 +        local shop_tutorial_ready = G.STATE == G.STATES.SHOP and G.shop and not G.SETTINGS.tutorial_progress.completed_parts['shop_1'] and (
-+            (not G.F_PORTRAIT and G.shop.VT.y < 5) or
-+            (G.F_PORTRAIT and G.SHOP_SIGN and G.shop_jokers and G.shop_jokers.cards and G.shop_jokers.cards[2] and
++            (not G.F_PORTRAIT_LAYOUT and G.shop.VT.y < 5) or
++            (G.F_PORTRAIT_LAYOUT and G.SHOP_SIGN and G.shop_jokers and G.shop_jokers.cards and G.shop_jokers.cards[2] and
 +                G.shop_vouchers and G.shop_vouchers.cards and G.shop_vouchers.cards[1] and
 +                G.shop_booster and G.shop_booster.cards and G.shop_booster.cards[1])
 +        )
@@ -183,7 +183,7 @@
 -    --G.SETTINGS.paused = true
 +    G.SETTINGS.paused = true
 +    local function portrait_attach(default_attach, y)
-+        if G.F_PORTRAIT then
++        if G.F_PORTRAIT_LAYOUT then
 +            return {major = G.ROOM_ATTACH, type = 'cm', offset = {x = 0, y = y or -4}}
 +        end
 +        return default_attach
@@ -309,7 +309,7 @@
              step = step,
          })
      elseif _part == 'first_hand_2' then
-+        local hand_attach = G.F_PORTRAIT and
++        local hand_attach = G.F_PORTRAIT_LAYOUT and
 +            {major = G.ROOM_ATTACH, type = 'cm', offset = {x = 0, y = -10}} or
 +            {major = G.hand, type = 'cl', offset = {x = -1.5, y = 0}}
          step = tutorial_info({
@@ -335,7 +335,7 @@
              step = step,
          })
      elseif _part == 'first_hand_3' then
-+        local hand_attach = G.F_PORTRAIT and
++        local hand_attach = G.F_PORTRAIT_LAYOUT and
 +            {major = G.ROOM_ATTACH, type = 'cm', offset = {x = 0, y = -10}} or
 +            {major = G.hand, type = 'cl', offset = {x = -1.5, y = 0}}
          step = tutorial_info({

@@ -200,7 +200,7 @@
 +--hand, so it never overlaps the cards during deal/play animations.
 +function rebuild_buttons_uibox()
 +    if G.buttons then G.buttons:remove(); G.buttons = nil end
-+    local swipe_only = G.F_PORTRAIT and G.F_SWIPE_ONLY
++    local swipe_only = G.F_PORTRAIT_LAYOUT and G.F_SWIPE_ONLY
 +    -- Both modes attach under the hand (the proven render path). Swipe Only's
 +    -- row starts level with the "8/8" counter: its first line is the swipe
 +    -- cue, which leaves the middle free for it.
@@ -220,9 +220,9 @@
 +    --button row and let set_screen_positions apply the new hand offset. Safe
 +    --to do live from anywhere (menu, shop, mid-run).
 +    G.F_SWIPE_ONLY = not not enabled
-+    if G.F_PORTRAIT and G.hand then portrait_set_hand_height() end
++    if G.F_PORTRAIT_LAYOUT and G.hand then portrait_set_hand_height() end
 +    if G.buttons then rebuild_buttons_uibox() end
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        pcall(set_screen_positions)
 +        if G.STAGE == G.STAGES.RUN then portrait_reflow_panels() end
 +    end
