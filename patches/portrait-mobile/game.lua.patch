@@ -1448,7 +1448,7 @@
      G.SPLASH_BACK:set_alignment({
          major = G.play,
          type = 'cm',
-@@ -2611,15 +2469,44 @@
+@@ -2611,15 +2469,37 @@
      self.deck:hard_set_cards()
      
      self.HUD = UIBox{
@@ -1461,13 +1461,7 @@
 +            major = (G.F_PORTRAIT_LAYOUT and G.ROOM or G.ROOM_ATTACH)
 +        }
      }
-+    
-+    if G.F_PORTRAIT_LAYOUT then
-+        -- Re-evaluate the top-middle anchor with the completed UIBox width.
-+        self.HUD:align_to_major()
-+        self.HUD:hard_set_VT()
-+    end
-+    
+
      self.HUD_blind = UIBox{
          definition = create_UIBox_HUD_blind(),
          config = {major = G.HUD:get_UIE_by_ID('row_blind'), align = 'cm', offset = {x=0,y=-10}, bond = 'Weak'}
@@ -1500,7 +1494,7 @@
       
      self.HUD:recalculate()
 +    -- The shelves of the non-classic layouts start under the HUD just built.
-+    if G.F_PORTRAIT_LAYOUT then self.HUD.alignment.prev_offset.x = nil; self.HUD:align_to_major(); self.HUD:hard_set_VT(); set_screen_positions() end
++    if G.F_PORTRAIT_LAYOUT then if portrait_center_run_hud then portrait_center_run_hud() end; set_screen_positions() end
  
      G.E_MANAGER:add_event(Event({
          trigger = 'immediate',
