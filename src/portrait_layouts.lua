@@ -887,14 +887,16 @@ end
 --Do not rely on Moveable:align_to_major() here: its unchanged-offset fast path
 --can keep a stale x coordinate after the UI definition changes width.
 function portrait_center_run_hud()
-  local hud, room = G and G.HUD, G and G.ROOM
+  local hud, anchor = G and G.HUD, G and G.ROOM_ATTACH
   if not (G and G.F_PORTRAIT_LAYOUT and hud and not hud.REMOVED
-          and hud.T and hud.VT and room and room.T) then return end
+          and hud.T and hud.VT and anchor and anchor.T) then return end
 
-  local x = room.T.x + (room.T.w - hud.T.w) / 2
+  -- ROOM is a Node and cannot be a Moveable role major. ROOM_ATTACH is
+  -- the Moveable anchor whose transform mirrors the live room viewport.
+  local x = anchor.T.x + (anchor.T.w - hud.T.w) / 2
   hud.T.x, hud.VT.x = x, x
-  if hud.role and hud.role.major == room and hud.role.offset then
-    hud.role.offset.x = x - room.T.x
+  if hud.role and hud.role.major == anchor and hud.role.offset then
+    hud.role.offset.x = x - anchor.T.x
   end
   if hud.alignment then
     hud.alignment.prev_offset = hud.alignment.prev_offset or {}
@@ -933,7 +935,8 @@ function portrait_rebuild_HUD()
 
   local row_align = is_portrait and 'tm' or 'cli'
   local row_offset = is_portrait and {x = 0, y = 0} or {x = -0.7, y = 0}
-  local row_major = is_portrait and G.ROOM or G.ROOM_ATTACH
+  -- Both landscape and portrait HUDs attach to the Moveable room anchor.
+  local row_major = G.ROOM_ATTACH
   G.HUD = UIBox{
     definition = is_portrait and create_UIBox_HUD_vertical() or create_UIBox_HUD(),
     config = {align = row_align, offset = row_offset, major = row_major}
