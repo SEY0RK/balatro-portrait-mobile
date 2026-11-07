@@ -50,7 +50,11 @@
 +local function _transform_rotated_input(x, y, dx, dy)
 +    if not (G and G.F_ROTATED_LANDSCAPE) then return x, y, dx, dy end
 +    local screen_w = G.PORTRAIT_SCREEN_W or love.graphics.getWidth()
-+    return y, screen_w - x, dy, -dx
++    -- mousepressed/mousereleased carry only x/y/button/touch. Their deltas are
++    -- nil; rotate the deltas only for mousemoved, where dx/dy are numeric.
++    local rotated_dx = type(dy) == 'number' and dy or nil
++    local rotated_dy = type(dx) == 'number' and -dx or nil
++    return y, screen_w - x, rotated_dx, rotated_dy
 +end
  require "engine/object"
  require "bit"
