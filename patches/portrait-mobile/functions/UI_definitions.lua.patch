@@ -1637,7 +1637,7 @@
      tab_alignment = 'tm',
      snap_to_nav = true}
      )}})
-@@ -2460,1 +2987,2 @@
+@@ -2460,1 +2987,3 @@
        create_option_cycle({w = 5, label = localize('b_set_play_discard_pos'),scale = 0.8, options = localize('ml_play_discard_pos_opt'), opt_callback = 'change_play_discard_position', current_option = (G.SETTINGS.play_button_pos)}),
 +      G.F_PORTRAIT and create_option_cycle({w = 5, label = 'Display Orientation',scale = 0.8, options = PORTRAIT_DISPLAY_MODES, opt_callback = 'change_portrait_display_mode', current_option = (G.SETTINGS.portrait_display_mode or 1)}) or nil,
 +      G.F_PORTRAIT_LAYOUT and create_option_cycle({w = 5, label = 'Layout',scale = 0.8, options = PORTRAIT_LAYOUT_NAMES, opt_callback = 'change_portrait_layout', current_option = (G.SETTINGS.portrait_layout or 1)}) or nil,
