@@ -1448,7 +1448,7 @@
      G.SPLASH_BACK:set_alignment({
          major = G.play,
          type = 'cm',
-@@ -2611,15 +2469,37 @@
+@@ -2611,15 +2469,38 @@
      self.deck:hard_set_cards()
      
      self.HUD = UIBox{
@@ -1461,7 +1461,7 @@
 +            major = (G.F_PORTRAIT_LAYOUT and G.ROOM or G.ROOM_ATTACH)
 +        }
      }
-
++    
      self.HUD_blind = UIBox{
          definition = create_UIBox_HUD_blind(),
          config = {major = G.HUD:get_UIE_by_ID('row_blind'), align = 'cm', offset = {x=0,y=-10}, bond = 'Weak'}
