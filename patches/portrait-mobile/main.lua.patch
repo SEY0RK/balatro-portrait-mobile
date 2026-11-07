@@ -1,6 +1,6 @@
 --- a/main.lua
 +++ b/main.lua
-@@ -1,9 +1,49 @@
+@@ -1,8 +1,48 @@
 -if (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
 +if (love.system.getOS() == 'OS X' ) and (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
  
@@ -50,7 +50,7 @@
  require "engine/controller"
  require "back"
  require "tag"
-@@ -20,6 +68,7 @@
+@@ -20,6 +60,7 @@
  require "functions/state_events"
  require "functions/common_events"
  require "functions/button_callbacks"
@@ -58,7 +58,7 @@
  require "functions/misc_functions"
  require "functions/test_functions"
  require "card"
-@@ -32,203 +81,368 @@
+@@ -32,203 +73,405 @@
  
  math.randomseed( G.SEED )
  
@@ -248,11 +248,23 @@
 -		splashVideo = love.graphics.newVideo("resources/videos/"..getSplashVideoFileName())
 -	end
 +	local initial_screen_w, initial_screen_h = love.graphics.getDimensions()
-+	G.F_FOLD_INNER = os_name == 'Android' and initial_screen_w > initial_screen_h
-+	G.F_ROTATED_LANDSCAPE = (os_name == 'Android' or os_name == 'iOS')
-+		and not G.F_FOLD_INNER and G.SETTINGS
-+		and G.SETTINGS.portrait_display_mode == 2 or false
-+	G.F_PORTRAIT_LAYOUT = not G.F_FOLD_INNER and not G.F_ROTATED_LANDSCAPE and not not G.F_PORTRAIT
++	G.F_FOLD_INNER = portrait_fold6_is_inner_display(initial_screen_w, initial_screen_h)
++	G.F_ROTATED_LANDSCAPE = false
++	G.F_PORTRAIT_LAYOUT = (os_name == 'Android' and not G.F_FOLD_INNER
++		and (G.SETTINGS.portrait_display_mode or 1) == 1)
++		or (os_name == 'iOS' and initial_screen_h > initial_screen_w)
++	if os_name == 'Android' and not G.F_FOLD_INNER then
++		local display_mode = G.SETTINGS.portrait_display_mode or 1
++		local orientation_ok, orientation_err = portrait_request_android_orientation(display_mode)
++		if not orientation_ok then print('ANDROID ORIENTATION REQUEST FAILED: '..tostring(orientation_err)) end
++		local target_landscape = display_mode == 2
++		if target_landscape ~= (initial_screen_w > initial_screen_h) then
++			G.PORTRAIT_LAYOUT_RELOAD_PENDING = {
++				mode = display_mode, previous_mode = display_mode,
++				started_at = love.timer.getTime(), stable_frames = 0
++			}
++		end
++	end
  
 -	if splashVideo then
 -		shouldSplash = true
@@ -485,7 +497,7 @@
 +        local os_name = love.system.getOS()
 +        if (os_name == 'Android' or os_name == 'iOS') and G and G.ROOM then
 +            local w, h = love.graphics.getDimensions()
-+            if w > 0 and h > 0 and G.TILESCALE and h > w then
++            if w > 0 and h > 0 and G.TILESCALE then
 +                love.graphics.setScissor()
 +                love.graphics.origin()
 +                love.graphics.clear(0, 0, 0, 1)
@@ -529,8 +541,8 @@
 +        local screen_h = love.graphics.getHeight()
 +        local canvas_w = G.CANVAS:getWidth() / (G.CANV_SCALE or 1)
 +        local canvas_h = G.CANVAS:getHeight() / (G.CANV_SCALE or 1)
-+        local expected_w = G.F_ROTATED_LANDSCAPE and screen_h or screen_w
-+        local expected_h = G.F_ROTATED_LANDSCAPE and screen_w or screen_h
++        local expected_w = screen_w
++        local expected_h = screen_h
 +        if math.abs(expected_w - canvas_w) > 2 or math.abs(expected_h - canvas_h) > 2 then
 +            love.resize(screen_w, screen_h)
 +        end
@@ -586,7 +598,7 @@
  	if not _RELEASE_MODE and G.keybind_mapping[key] then love.gamepadpressed(G.CONTROLLER.keyboard_controller, G.keybind_mapping[key])
  	else
  		G.CONTROLLER:set_HID_flags('mouse')
-@@ -237,14 +451,6 @@
+@@ -237,14 +480,6 @@
  end
  
  function love.keyreleased(key)
@@ -601,7 +613,7 @@
  	if not _RELEASE_MODE and G.keybind_mapping[key] then love.gamepadreleased(G.CONTROLLER.keyboard_controller, G.keybind_mapping[key])
  	else
  		G.CONTROLLER:set_HID_flags('mouse')
-@@ -252,6 +458,22 @@
+@@ -252,6 +487,22 @@
  	end
  end
  
@@ -624,7 +636,7 @@
  function love.gamepadpressed(joystick, button)
  	button = G.button_mapping[button] or button
  	G.CONTROLLER:set_gamepad(joystick)
-@@ -266,9 +488,44 @@
+@@ -266,9 +517,44 @@
      G.CONTROLLER:button_release(button)
  end
  
@@ -670,7 +682,7 @@
  		G.CONTROLLER:queue_L_cursor_press(x, y)
  	end
  	if button == 2 then
-@@ -277,47 +534,174 @@
+@@ -277,47 +563,151 @@
  end
  
  
@@ -836,7 +848,7 @@
  				local request = CHANNEL:demand()
  				if request then
  					https.request(request)
-@@ -333,7 +693,6 @@
+@@ -333,7 +723,6 @@
  			str = str:gsub("\n", "\r\n"):gsub("([^%w _%%%-%.~])", char_to_hex):gsub(" ", "+")
  			return str
  		end
@@ -844,7 +856,7 @@
  
  		local error = msg
  		local file = string.sub(msg, 0,  string.find(msg, ':'))
-@@ -351,7 +710,7 @@
+@@ -351,7 +740,7 @@
  				function_line = string.sub(l, string.find(l, 'in function')+12)..' line:'..function_line
  			end
  
@@ -853,7 +865,7 @@
  				trace = trace..l..'\n'
  			end
  		end
-@@ -370,39 +729,61 @@
+@@ -370,39 +759,61 @@
  		end
  	end
  
@@ -927,7 +939,7 @@
  	end
  
  	while true do
-@@ -411,16 +792,15 @@
+@@ -411,16 +822,15 @@
  		for e, a, b, c in love.event.poll() do
  			if e == "quit" then
  				return
@@ -951,12 +963,11 @@
  			end
  		end
  
-@@ -434,51 +814,210 @@
+@@ -434,49 +844,196 @@
  end
  
 -function love.resize(w, h)
 +local function _portrait_apply_resize(w, h)
-+	if not G or not G.ROOM then
 +	if not G or not G.ROOM then
 +		return
  	end
@@ -974,21 +985,17 @@
 +	local physical_w, physical_h = w, h
 +	local is_mobile = (os_name == 'Android' or os_name == 'iOS')
 +	local old_fold_inner = not not G.F_FOLD_INNER
-+	G.F_FOLD_INNER = os_name == 'Android' and physical_w > physical_h
-+	G.F_ROTATED_LANDSCAPE = is_mobile and not G.F_FOLD_INNER
-+		and G.SETTINGS and G.SETTINGS.portrait_display_mode == 2 or false
++	G.F_FOLD_INNER = portrait_fold6_is_inner_display(physical_w, physical_h)
++	G.F_ROTATED_LANDSCAPE = false
 +	G.F_PORTRAIT = is_mobile or (h > w)
-+	G.F_PORTRAIT_LAYOUT = not G.F_FOLD_INNER and not G.F_ROTATED_LANDSCAPE and G.F_PORTRAIT
++	G.F_PORTRAIT_LAYOUT = (os_name == 'Android' and not G.F_FOLD_INNER
++		and (G.SETTINGS.portrait_display_mode or 1) == 1)
++		or (os_name == 'iOS' and h > w)
 +	if G.FOLD_LAYOUT_INITIALIZED and old_fold_inner ~= G.F_FOLD_INNER then
 +		G.PORTRAIT_FOLD_RELOAD_PENDING = true
 +	end
 +	G.FOLD_LAYOUT_INITIALIZED = true
-+	if G.F_ROTATED_LANDSCAPE then
-+		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
-+		w, h = h, w
-+	else
-+		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
-+	end
++	G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
 +	if is_mobile then
 +		G.F_PORTRAIT = true
  	else
