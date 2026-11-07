@@ -977,14 +977,14 @@
  			end
  		end
  
-@@ -434,52 +857,212 @@
+@@ -434,51 +857,212 @@
  end
  
 -function love.resize(w, h)
 +local function _portrait_apply_resize(w, h)
 +	if not G or not G.ROOM then
 +		return
- 	end
++	end
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
 -		h = w/1
 -	end
