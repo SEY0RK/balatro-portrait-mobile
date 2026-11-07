@@ -523,6 +523,7 @@
 +    G:update(dt)
  end
  
++local _portrait_apply_resize
  function love.draw()
 +    local os_name = love.system.getOS()
 +    -- The first Android resize can arrive before ROOM exists and be deferred.
@@ -1006,7 +1007,7 @@
  end
  
 -function love.resize(w, h)
-+local function _portrait_apply_resize(w, h)
++_portrait_apply_resize = function(w, h)
 +	if not G then return end
 +	if not G.ROOM then G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}; return end
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
