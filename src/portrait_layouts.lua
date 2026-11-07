@@ -1250,6 +1250,14 @@ function portrait_refresh_backdrop()
     bg.VT.w = bg.T.w
     bg.VT.h = bg.T.h
   end
+  -- The main-menu backdrop covers the physical display, including the top
+  -- inset. ROOM_ATTACH is shifted down to keep UI clear of the status area;
+  -- cancel that shift only for the backdrop, not for the menu controls.
+  if G.STAGE == G.STAGES.MAIN_MENU and G.ROOM_ATTACH and bg.alignment
+     and bg.alignment.major == G.ROOM_ATTACH then
+    bg.alignment.offset = bg.alignment.offset or {x = 0, y = 0}
+    bg.alignment.offset.y = G.F_PORTRAIT_LAYOUT and -(G.ROOM_ATTACH.T.y or 0) or 0
+  end
   if bg.align_to_major then bg:align_to_major() end
   if bg.hard_set_VT then bg:hard_set_VT() end
 end
