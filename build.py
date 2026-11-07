@@ -1079,11 +1079,8 @@ def _patch_sdl_portrait_orientation(apk_out):
         super_match = re.search(r"(?m)^\.super\s+[^\n]+$", smali)
         if not super_match:
             raise RuntimeError(f".super declaration not found in {smali_path}")
-        class_end = smali.rfind(".end class")
-        if class_end == -1:
-            raise RuntimeError(f"Could not find .end class in {smali_path}")
         declaration = re.search(r"(?m)^\.(?:field|method)\b", smali)
-        insert_at = declaration.start() if declaration else class_end
+        insert_at = declaration.start() if declaration else len(smali)
         smali = smali[:insert_at] + field_decl + "\n" + smali[insert_at:]
 
     # SDL calls this from native window creation and when the window's
@@ -1170,10 +1167,7 @@ def _patch_sdl_portrait_orientation(apk_out):
             "    return-void\n"
             ".end method\n"
         )
-        class_end = smali.rfind(".end class")
-        if class_end == -1:
-            raise RuntimeError(f"Could not find .end class in {smali_path}")
-        smali = smali[:class_end] + helper_method + smali[class_end:]
+        smali = smali.rstrip() + helper_method
 
     on_config_match = re.search(
         r"(?m)^\.method\s+\w+\s+onConfigurationChanged\(Landroid/content/res/Configuration;\)V\s*$",
@@ -1193,10 +1187,7 @@ def _patch_sdl_portrait_orientation(apk_out):
             "    return-void\n"
             ".end method\n"
         )
-        class_end = smali.rfind(".end class")
-        if class_end == -1:
-            raise RuntimeError(f"Could not find .end class in {smali_path}")
-        smali = smali[:class_end] + on_config_method + smali[class_end:]
+        smali = smali.rstrip() + on_config_method
     else:
         on_config_end = smali.find(".end method", on_config_start)
         if on_config_end == -1:
