@@ -451,6 +451,11 @@ function portrait_diagnostics_report()
         if G.ROOM and G.ROOM.T then
             add("Room tiles", "w=" .. fmt(G.ROOM.T.w) .. " h=" .. fmt(G.ROOM.T.h) .. " y=" .. fmt(G.ROOM.T.y))
         end
+        if G.HUD and G.HUD.T and G.ROOM and G.ROOM.T then
+            add("HUD box", "x=" .. fmt(G.HUD.T.x) .. " y=" .. fmt(G.HUD.T.y) .. " w=" .. fmt(G.HUD.T.w) .. " h=" .. fmt(G.HUD.T.h))
+            add("HUD center", fmt(G.HUD.T.x + G.HUD.T.w/2) .. " / room " .. fmt(G.ROOM.T.x + G.ROOM.T.w/2))
+            add("HUD role x", G.HUD.role and fmt(G.HUD.role.offset and G.HUD.role.offset.x) or "?")
+        end
         add("Portrait", G.F_PORTRAIT_LAYOUT and "yes" or "no")
         add("Swipe only", G.F_SWIPE_ONLY and "yes" or "no")
     end
