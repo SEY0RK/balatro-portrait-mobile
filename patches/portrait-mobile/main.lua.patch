@@ -247,8 +247,6 @@
 -	if love.platform.isArcade and love.platform.isArcade() then
 -		splashVideo = love.graphics.newVideo("resources/videos/"..getSplashVideoFileName())
 -	end
-+	_force_android_portrait_hints()
-+
 +	local initial_screen_w, initial_screen_h = love.graphics.getDimensions()
 +	G.F_FOLD_INNER = os_name == 'Android' and initial_screen_w > initial_screen_h
 +	G.F_ROTATED_LANDSCAPE = (os_name == 'Android' or os_name == 'iOS')
@@ -929,12 +927,12 @@
  			end
  		end
  
-@@ -434,51 +814,190 @@
+@@ -434,51 +814,210 @@
  end
  
- function love.resize(w, h)
--	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
--		h = w/1
+-function love.resize(w, h)
++local function _portrait_apply_resize(w, h)
++	if not G or not G.ROOM then
 +	if not G or not G.ROOM then
 +		return
  	end
@@ -951,24 +949,23 @@
 +	local os_name = love.system.getOS()
 +	local physical_w, physical_h = w, h
 +	local is_mobile = (os_name == 'Android' or os_name == 'iOS')
-+	G.F_ROTATED_LANDSCAPE = is_mobile and G.SETTINGS and G.SETTINGS.portrait_display_mode == 2 or false
++	local old_fold_inner = not not G.F_FOLD_INNER
++	G.F_FOLD_INNER = os_name == 'Android' and physical_w > physical_h
++	G.F_ROTATED_LANDSCAPE = is_mobile and not G.F_FOLD_INNER
++		and G.SETTINGS and G.SETTINGS.portrait_display_mode == 2 or false
 +	G.F_PORTRAIT = is_mobile or (h > w)
-+	G.F_PORTRAIT_LAYOUT = not G.F_ROTATED_LANDSCAPE and G.F_PORTRAIT
++	G.F_PORTRAIT_LAYOUT = not G.F_FOLD_INNER and not G.F_ROTATED_LANDSCAPE and G.F_PORTRAIT
++	if G.FOLD_LAYOUT_INITIALIZED and old_fold_inner ~= G.F_FOLD_INNER then
++		G.PORTRAIT_FOLD_RELOAD_PENDING = true
++	end
++	G.FOLD_LAYOUT_INITIALIZED = true
 +	if G.F_ROTATED_LANDSCAPE then
 +		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
 +		w, h = h, w
 +	else
 +		G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
 +	end
-+	if (os_name == 'Android' or os_name == 'iOS') then
-+		if w > h and not G.F_ROTATED_LANDSCAPE then
-+			if not G.window_prev or not G.CANV_SCALE then return end
-+			if G.CANVAS then G.CANVAS:release() end
-+			G.CANVAS = love.graphics.newCanvas(w*G.CANV_SCALE, h*G.CANV_SCALE, {type = '2d', readable = true})
-+			if G.CANVAS then G.CANVAS:setFilter('linear', 'linear') end
-+			if G.CANVAS then G.CANVAS:setWrap('clampzero') end
-+			return
-+		end
++	if is_mobile then
 +		G.F_PORTRAIT = true
  	else
 -		G.TILESCALE = G.window_prev.orig_scale*h/G.window_prev.h
@@ -1148,4 +1145,15 @@
 +			}
 +		end
 +	end
++end
++
++function love.resize(w, h)
++	if love.system.getOS() == 'Android' and G and G.ROOM then
++		local pending = G.PORTRAIT_RESIZE_PENDING
++		if not pending or pending.w ~= w or pending.h ~= h then
++			G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}
++		end
++		return
++	end
++	_portrait_apply_resize(w, h)
 +end
