@@ -883,6 +883,26 @@ function portrait_place_areas()
 end
 
 -- ===========================================================================
+--Place the classic portrait HUD from its measured width, after UIBox:recalculate().
+--Do not rely on Moveable:align_to_major() here: its unchanged-offset fast path
+--can keep a stale x coordinate after the UI definition changes width.
+function portrait_center_run_hud()
+  local hud, room = G and G.HUD, G and G.ROOM
+  if not (G and G.F_PORTRAIT_LAYOUT and hud and not hud.REMOVED
+          and hud.T and hud.VT and room and room.T) then return end
+
+  local x = room.T.x + (room.T.w - hud.T.w) / 2
+  hud.T.x, hud.VT.x = x, x
+  if hud.role and hud.role.major == room and hud.role.offset then
+    hud.role.offset.x = x - room.T.x
+  end
+  if hud.alignment then
+    hud.alignment.prev_offset = hud.alignment.prev_offset or {}
+    hud.alignment.prev_offset.x = hud.alignment.offset and hud.alignment.offset.x or 0
+    hud.alignment.prev_type = hud.alignment.type
+  end
+  if hud.UIRoot and hud.UIRoot.initialize_VT then hud.UIRoot:initialize_VT() end
+end
 -- Switching styles in a run
 -- ===========================================================================
 
