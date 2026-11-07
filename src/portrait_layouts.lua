@@ -882,29 +882,6 @@ function portrait_place_areas()
   return true
 end
 
--- ===========================================================================
---Place the classic portrait HUD from its measured width, after UIBox:recalculate().
---Do not rely on Moveable:align_to_major() here: its unchanged-offset fast path
---can keep a stale x coordinate after the UI definition changes width.
-function portrait_center_run_hud()
-  local hud, anchor = G and G.HUD, G and G.ROOM_ATTACH
-  if not (G and G.F_PORTRAIT_LAYOUT and hud and not hud.REMOVED
-          and hud.T and hud.VT and anchor and anchor.T) then return end
-
-  -- ROOM is a Node and cannot be a Moveable role major. ROOM_ATTACH is
-  -- the Moveable anchor whose transform mirrors the live room viewport.
-  local x = anchor.T.x + (anchor.T.w - hud.T.w) / 2
-  hud.T.x, hud.VT.x = x, x
-  if hud.role and hud.role.major == anchor and hud.role.offset then
-    hud.role.offset.x = x - anchor.T.x
-  end
-  if hud.alignment then
-    hud.alignment.prev_offset = hud.alignment.prev_offset or {}
-    hud.alignment.prev_offset.x = hud.alignment.offset and hud.alignment.offset.x or 0
-    hud.alignment.prev_type = hud.alignment.type
-  end
-  if hud.UIRoot and hud.UIRoot.initialize_VT then hud.UIRoot:initialize_VT() end
-end
 -- Switching styles in a run
 -- ===========================================================================
 
@@ -935,14 +912,16 @@ function portrait_rebuild_HUD()
 
   local row_align = is_portrait and 'tm' or 'cli'
   local row_offset = is_portrait and {x = 0, y = 0} or {x = -0.7, y = 0}
-  -- Both landscape and portrait HUDs attach to the Moveable room anchor.
-  local row_major = G.ROOM_ATTACH
+  -- Keep the proven upstream split: the portrait HUD is aligned directly to
+  -- ROOM and positioned from ROOM's measured width; landscape uses ROOM_ATTACH.
+  local row_major = is_portrait and G.ROOM or G.ROOM_ATTACH
   G.HUD = UIBox{
     definition = is_portrait and create_UIBox_HUD_vertical() or create_UIBox_HUD(),
     config = {align = row_align, offset = row_offset, major = row_major}
   }
   if is_portrait then
     G.HUD.T.y = 0.2
+    G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
   end
 
   local row_blind = G.HUD:get_UIE_by_ID('row_blind')
@@ -976,7 +955,9 @@ function portrait_rebuild_HUD()
   }
   G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
   G.HUD:recalculate()
-  if is_portrait then portrait_center_run_hud() end
+  if is_portrait then
+    G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
+  end
   G.HUD_blind:recalculate()
 
   if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
