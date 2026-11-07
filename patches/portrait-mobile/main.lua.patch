@@ -58,7 +58,7 @@
  require "functions/misc_functions"
  require "functions/test_functions"
  require "card"
-@@ -32,203 +73,417 @@
+@@ -32,203 +73,418 @@
  
  math.randomseed( G.SEED )
  
@@ -513,10 +513,8 @@
 +                love.graphics.setScissor()
 +                love.graphics.origin()
 +                love.graphics.clear(0, 0, 0, 1)
-+                if G.CANVAS then
-+                    G.CANVAS:release()
-+                    G.CANVAS = nil
-+                end
++                -- Keep the previous complete canvas alive until the debounced
++                -- Android resize has a stable target surface and can replace it.
 +                love.resize(w, h)
 +            end
 +        end
@@ -565,7 +563,10 @@
 +            else
 +                pending.stable_frames = pending.stable_frames + 1
 +            end
-+            if pending.stable_frames >= 2 then
++            local waiting_for_requested_orientation = G.PORTRAIT_LAYOUT_RELOAD_PENDING
++                and ((G.PORTRAIT_LAYOUT_RELOAD_PENDING.mode == 2 and screen_w <= screen_h)
++                    or (G.PORTRAIT_LAYOUT_RELOAD_PENDING.mode ~= 2 and screen_h <= screen_w))
++            if pending.stable_frames >= 2 and not waiting_for_requested_orientation then
 +                G.PORTRAIT_RESIZE_PENDING = nil
 +                _portrait_apply_resize(screen_w, screen_h)
 +            else
@@ -610,7 +611,7 @@
  	if not _RELEASE_MODE and G.keybind_mapping[key] then love.gamepadpressed(G.CONTROLLER.keyboard_controller, G.keybind_mapping[key])
  	else
  		G.CONTROLLER:set_HID_flags('mouse')
-@@ -237,14 +492,6 @@
+@@ -237,14 +493,6 @@
  end
  
  function love.keyreleased(key)
@@ -625,7 +626,7 @@
  	if not _RELEASE_MODE and G.keybind_mapping[key] then love.gamepadreleased(G.CONTROLLER.keyboard_controller, G.keybind_mapping[key])
  	else
  		G.CONTROLLER:set_HID_flags('mouse')
-@@ -252,6 +499,22 @@
+@@ -252,6 +500,22 @@
  	end
  end
  
@@ -648,7 +649,7 @@
  function love.gamepadpressed(joystick, button)
  	button = G.button_mapping[button] or button
  	G.CONTROLLER:set_gamepad(joystick)
-@@ -266,9 +529,44 @@
+@@ -266,9 +530,44 @@
      G.CONTROLLER:button_release(button)
  end
  
@@ -694,7 +695,7 @@
  		G.CONTROLLER:queue_L_cursor_press(x, y)
  	end
  	if button == 2 then
-@@ -277,47 +575,151 @@
+@@ -277,47 +576,151 @@
  end
  
  
@@ -860,7 +861,7 @@
  				local request = CHANNEL:demand()
  				if request then
  					https.request(request)
-@@ -333,7 +735,6 @@
+@@ -333,7 +736,6 @@
  			str = str:gsub("\n", "\r\n"):gsub("([^%w _%%%-%.~])", char_to_hex):gsub(" ", "+")
  			return str
  		end
@@ -868,7 +869,7 @@
  
  		local error = msg
  		local file = string.sub(msg, 0,  string.find(msg, ':'))
-@@ -351,7 +752,7 @@
+@@ -351,7 +753,7 @@
  				function_line = string.sub(l, string.find(l, 'in function')+12)..' line:'..function_line
  			end
  
@@ -877,7 +878,7 @@
  				trace = trace..l..'\n'
  			end
  		end
-@@ -370,39 +771,61 @@
+@@ -370,39 +772,61 @@
  		end
  	end
  
@@ -951,7 +952,7 @@
  	end
  
  	while true do
-@@ -411,16 +834,15 @@
+@@ -411,16 +835,15 @@
  		for e, a, b, c in love.event.poll() do
  			if e == "quit" then
  				return
@@ -975,7 +976,7 @@
  			end
  		end
  
-@@ -434,49 +856,212 @@
+@@ -434,49 +857,212 @@
  end
  
 -function love.resize(w, h)
