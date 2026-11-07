@@ -1207,7 +1207,28 @@ def _patch_sdl_portrait_orientation(apk_out):
                 insert_at = on_config_start + locals_match.end()
             smali = smali[:insert_at] + "\n" + helper_invoke + smali[insert_at:]
 
-    with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
+    # SDL's Android window-style command can block the caller for up to
+    # 500 ms while waiting for surfaceChanged. The game layer independently
+    # waits for the target dimensions to remain stable for two frames before
+    # rebuilding the scene, so keep a bounded fallback but avoid spending half
+    # a second here when Android delivers the surface callback late.
+    command_signature = ".method sendCommand(ILjava/lang/Object;)Z"
+    command_start = smali.find(command_signature)
+    if command_start == -1:
+        raise RuntimeError(f"{command_signature} not found in {smali_path}")
+    command_end = smali.find(".end method", command_start)
+    if command_end == -1:
+        raise RuntimeError(f"{command_signature} has no .end method in {smali_path}")
+    command_body = smali[command_start:command_end]
+    old_wait = "const-wide/16 v1, 0x1f4"
+    new_wait = "const-wide/16 v1, 0xc8"
+    if old_wait in command_body:
+        command_body = command_body.replace(old_wait, new_wait, 1)
+    elif new_wait not in command_body:
+        raise RuntimeError("SDL surface wait timeout was not found or already patched")
+    smali = smali[:command_start] + command_body + smali[command_end:]
+
+    with open(smali_path, "w", encoding="utf-8", newline="\\n") as f:
         f.write(smali)
 
 def build_apk(profiler=None):
