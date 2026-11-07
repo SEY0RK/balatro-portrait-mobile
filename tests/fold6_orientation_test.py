@@ -1,8 +1,10 @@
 """Synthetic tests for the Fold6 SDLActivity orientation patch."""
 
 import pathlib
+import sys
 import tempfile
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import build
 
 
