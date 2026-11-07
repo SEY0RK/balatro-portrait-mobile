@@ -1822,12 +1822,12 @@
          G.SHADERS['CRT']:send('crt_intensity', 0.16*G.SETTINGS.GRAPHICS.crt/100)
          G.SHADERS['CRT']:send('glitch_intensity', 0)--0.1*G.SETTINGS.GRAPHICS.crt/100 + (G.screenwipe_amt) + 1)
          G.SHADERS['CRT']:send('scanlines', G.CANVAS:getPixelHeight()*0.75/G.CANV_SCALE)
-@@ -3305,8 +3059,12 @@
+@@ -3305,7 +3059,12 @@
          love.graphics.setShader( G.SHADERS['CRT'])
          G.SETTINGS.GRAPHICS.crt = G.SETTINGS.GRAPHICS.crt/0.3
      end
          love.graphics.scale(1/G.CANV_SCALE)
- 
++
 +        if G.F_ROTATED_LANDSCAPE and not G.AA_CANVAS then
 +            love.graphics.translate(G.PORTRAIT_SCREEN_W or love.graphics.getWidth(), 0)
 +            love.graphics.rotate(math.pi/2)
