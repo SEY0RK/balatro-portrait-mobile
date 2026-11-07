@@ -8,7 +8,7 @@
 +    -- add_speech_bubble), so a button at the usual 0.3 landed on the bubble's
 +    -- text (Cryptid's intro). It goes under the bubble instead.
 +    local sb = self.children.speech_bubble
-+    if G.F_PORTRAIT and sb and sb.T and sb.T.h > 0 then
++    if G.F_PORTRAIT_LAYOUT and sb and sb.T and sb.T.h > 0 then
 +        local sb_bottom = (self.config.speech_bubble_align and self.config.speech_bubble_align.offset.y or 0.3) + sb.T.h
 +        yoff = math.max(yoff or 0.3, sb_bottom + 0.15)
 +    end
@@ -22,7 +22,7 @@
 -    self.config.speech_bubble_align = {align=align or 'bm', offset = {x=0,y=0},parent = self}
 +    local sb_align = align or 'bm'
 +    local sb_offset_y = 0
-+    if G.F_PORTRAIT then
++    if G.F_PORTRAIT_LAYOUT then
 +        sb_align = 'bm'
 +        sb_offset_y = 0.3
 +    end

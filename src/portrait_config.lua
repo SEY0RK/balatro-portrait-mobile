@@ -451,7 +451,22 @@ function portrait_diagnostics_report()
         if G.ROOM and G.ROOM.T then
             add("Room tiles", "w=" .. fmt(G.ROOM.T.w) .. " h=" .. fmt(G.ROOM.T.h) .. " y=" .. fmt(G.ROOM.T.y))
         end
-        add("Portrait", G.F_PORTRAIT and "yes" or "no")
+        if G.HUD and G.HUD.T and G.ROOM and G.ROOM.T then
+            add("HUD box", "x=" .. fmt(G.HUD.T.x) .. " y=" .. fmt(G.HUD.T.y) .. " w=" .. fmt(G.HUD.T.w) .. " h=" .. fmt(G.HUD.T.h))
+            add("HUD center", fmt(G.HUD.T.x + G.HUD.T.w/2) .. " / room " .. fmt(G.ROOM.T.x + G.ROOM.T.w/2))
+            add("HUD VT x", G.HUD.VT and fmt(G.HUD.VT.x) or "?")
+            add("HUD position passes", tostring(G.HUD._portrait_position_passes or 0))
+            add("HUD last target x", G.HUD._portrait_position_last_x and fmt(G.HUD._portrait_position_last_x) or "not-run")
+            add("HUD role x", G.HUD.role and fmt(G.HUD.role.offset and G.HUD.role.offset.x) or "?")
+            add("HUD role type", G.HUD.role and G.HUD.role.role_type or "?")
+            local major = G.HUD.config and G.HUD.config.major
+            add("HUD anchor", major == G.ROOM_ATTACH and "ROOM_ATTACH" or major == G.ROOM and "ROOM_NODE" or major == G.HUD and "SELF" or major and "OTHER" or "NONE")
+            add("HUD role major", G.HUD.role and G.HUD.role.major and (G.HUD.role.major == G.ROOM_ATTACH and "ROOM_ATTACH" or G.HUD.role.major == G.ROOM and "ROOM_NODE" or "OTHER") or "NONE")
+            if major and major.T then add("HUD major rect", "x=" .. fmt(major.T.x) .. " w=" .. fmt(major.T.w)) end
+            add("HUD target x", fmt(G.ROOM.T.x + (G.ROOM.T.w - G.HUD.T.w) / 2))
+            add("HUD align", G.HUD.alignment and tostring(G.HUD.alignment.type) or "?")
+        end
+        add("Portrait", G.F_PORTRAIT_LAYOUT and "yes" or "no")
         add("Swipe only", G.F_SWIPE_ONLY and "yes" or "no")
     end
     local top_ok, top = pcall(get_mobile_safe_area_top, os_name)
@@ -466,6 +481,18 @@ function portrait_diagnostics_report()
     else
         add("Build", "bundled (build.py)")
     end
+    local switch_metrics = PORTRAIT_SWITCH_METRICS
+    if switch_metrics then
+        add("Switch snapshot ms", switch_metrics.snapshot_ms and fmt(switch_metrics.snapshot_ms) or "pending")
+        add("Switch settings save ms", switch_metrics.settings_save_ms and fmt(switch_metrics.settings_save_ms) or "pending")
+        add("Switch orientation ms", switch_metrics.orientation_request_ms and fmt(switch_metrics.orientation_request_ms) or "pending")
+        add("Switch surface wait ms", switch_metrics.surface_wait_ms and fmt(switch_metrics.surface_wait_ms) or "pending")
+        add("Switch pre-transition ms", switch_metrics.pre_transition_ms and fmt(switch_metrics.pre_transition_ms) or "pending")
+        add("Switch queue wait ms", switch_metrics.queue_to_start_run_ms and fmt(switch_metrics.queue_to_start_run_ms) or "pending")
+        add("Switch start_run ms", switch_metrics.game_start_run_ms and fmt(switch_metrics.game_start_run_ms) or "pending")
+        add("Switch total ms", switch_metrics.first_frame_total_ms and fmt(switch_metrics.first_frame_total_ms) or "pending")
+        if switch_metrics.failed_stage then add("Switch failed stage", tostring(switch_metrics.failed_stage)) end
+    end
     if love.timer and love.timer.getFPS then
         add("FPS", love.timer.getFPS())
     end
@@ -479,7 +506,7 @@ end
 -- Idempotent, a no-op without Steamodded, and it leaves pages that already fit
 -- exactly as Steamodded built them.
 function portrait_hook_smods_collection()
-    if not (G and G.F_PORTRAIT) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT) then return end
     if not (SMODS and type(SMODS.card_collection_UIBox) == 'function') then return end
     if SMODS.portrait_collection_hooked then return end
 
@@ -493,7 +520,7 @@ function portrait_hook_smods_collection()
         local card_w = G.CARD_W or 0
         local room_w = (G.ROOM and G.ROOM.T and G.ROOM.T.w) or 0
 
-        if G.F_PORTRAIT and widest > 0 and card_w > 0 and room_w > 0 then
+        if G.F_PORTRAIT_LAYOUT and widest > 0 and card_w > 0 and room_w > 0 then
             -- Steamodded sizes each row as (w_mod*columns + 0.25) cards wide, so
             -- solve that for the width the room can actually show. Pages that
             -- already fit are left alone; the ones that do not (more columns than
@@ -527,7 +554,7 @@ function portrait_hook_smods_collection()
                 if node.config and node.config.minw and node.config.minw > max_w then node.config.minw = max_w end
                 for _, child in pairs(node.nodes or {}) do clamp(child) end
             end
-            if G.F_PORTRAIT then clamp(t) end
+            if G.F_PORTRAIT_LAYOUT then clamp(t) end
             return t
         end
     end
@@ -543,7 +570,7 @@ function portrait_hook_smods_collection()
         create_UIBox_your_collection_blinds = function(...)
             local t = smods_blinds(...)
             local room_w = (G.ROOM and G.ROOM.T and G.ROOM.T.w) or 0
-            if G.F_PORTRAIT and room_w > 0 and room_w < 13 and G.your_collection then
+            if G.F_PORTRAIT_LAYOUT and room_w > 0 and room_w < 13 and G.your_collection then
                 for _, area in ipairs(G.your_collection) do
                     local cols = area.config and area.config.card_limit
                     if cols and area.T.w > cols * 1.32 then area.T.w = cols * 1.32 end
@@ -609,7 +636,7 @@ end
 -- The boxes, their order and the page mechanism stay Steamodded's, so this
 -- holds across its releases. Idempotent, and a no-op without it or in landscape.
 function portrait_hook_smods_mod_list()
-    if not (G and G.F_PORTRAIT) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT) then return end
     if not (SMODS and SMODS.GUI and type(SMODS.GUI.dynamicModListContent) == 'function') then return end
     if SMODS.portrait_mod_list_hooked then return end
 
@@ -639,7 +666,7 @@ function portrait_hook_smods_mod_list()
     if type(SMODS.GUI.createOptionSelector) == 'function' then
         local smods_selector = SMODS.GUI.createOptionSelector
         SMODS.GUI.createOptionSelector = function(args)
-            if G.F_PORTRAIT and type(args) == 'table' and args.opt_callback == 'update_mod_list' then
+            if G.F_PORTRAIT_LAYOUT and type(args) == 'table' and args.opt_callback == 'update_mod_list' then
                 local count = page_count()
                 local current = math.min(math.max(SMODS.portrait_mod_page or 1, 1), count)
                 SMODS.portrait_mod_page = current
@@ -657,7 +684,7 @@ function portrait_hook_smods_mod_list()
         SMODS.GUI.staticModListContent = function(...)
             local pane = smods_static(...)
             local cfg = PORTRAIT_CONFIG or {}
-            local room = G.F_PORTRAIT and G.ROOM and G.ROOM.T
+            local room = G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T
             if not (room and room.w and room.w > 0) then return pane end
 
             local usable = room.w - (cfg.mod_list_margin or 2.1)
@@ -698,7 +725,7 @@ function portrait_hook_smods_mod_list()
 
     local smods_mod_list = SMODS.GUI.dynamicModListContent
     SMODS.GUI.dynamicModListContent = function(page)
-        if not G.F_PORTRAIT then return smods_mod_list(page) end
+        if not G.F_PORTRAIT_LAYOUT then return smods_mod_list(page) end
 
         local count, size, total = page_count()
         local index = math.min(math.max(tonumber(page) or SMODS.portrait_mod_page or 1, 1), count)
@@ -753,7 +780,7 @@ end
 -- goes under the grid, and the nav row becomes two: page buttons and Quick
 -- Start, then the seed. Steamodded builds and drives the page as ever.
 function portrait_hook_smods_run_select()
-    if not (G and G.F_PORTRAIT) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT) then return end
     if not (SMODS and SMODS.RunSelect and SMODS.RunSelect.Functions and SMODS.RunSelect.Pages) then return end
     local F = SMODS.RunSelect.Functions
     if F.portrait_hooked or not (F.create_page and F.nav_bar) then return end
@@ -774,7 +801,7 @@ function portrait_hook_smods_run_select()
     F.create_page = function(key, ...)
         fit_grid(SMODS.RunSelect.Pages[key])
         local t = create_page(key, ...)
-        if G.F_PORTRAIT and t and t.nodes and #t.nodes == 2 then
+        if G.F_PORTRAIT_LAYOUT and t and t.nodes and #t.nodes == 2 then
             t.config = t.config or {}
             t.config.align = 'tm'
             t.nodes = {
@@ -796,7 +823,7 @@ function portrait_hook_smods_run_select()
     local nav_bar = F.nav_bar
     F.nav_bar = function(...)
         local t = nav_bar(...)
-        if not (G.F_PORTRAIT and t and t.nodes) then return t end
+        if not (G.F_PORTRAIT_LAYOUT and t and t.nodes) then return t end
         local pager, rest = {}, {}
         for _, child in ipairs(t.nodes) do
             local is_pager = holds(child, function(c)
@@ -815,7 +842,7 @@ function portrait_hook_smods_run_select()
 end
 
 function portrait_default_smods_run_select()
-    if not (G and G.F_PORTRAIT) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT) then return end
     if not (SMODS and type(SMODS.config) == 'table') then return end
     if PORTRAIT_CONFIG and PORTRAIT_CONFIG.smods_vanilla_run_select == false then return end
     if SMODS.config.vanilla_run_select == nil then
@@ -824,7 +851,7 @@ function portrait_default_smods_run_select()
 end
 
 function portrait_adopt_mods_button(definition)
-    if not (G and G.F_PORTRAIT and definition and definition.nodes) then return definition end
+    if not (G and G.F_PORTRAIT_LAYOUT and definition and definition.nodes) then return definition end
 
     -- The MODS button is the way into the mod list, so hook it while we are here.
     if portrait_hook_smods_mod_list then portrait_hook_smods_mod_list() end
@@ -927,7 +954,7 @@ end
 -- current room with a margin, or 1 when it already fits. Reading the live room
 -- width keeps it correct on every aspect ratio instead of one tuned device.
 function get_portrait_fit_scale(nominal_w, margin)
-    if not (G and G.F_PORTRAIT and G.ROOM and G.ROOM.T and G.ROOM.T.w) then return 1 end
+    if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and G.ROOM.T.w) then return 1 end
     if type(nominal_w) ~= 'number' or nominal_w <= 0 then return 1 end
     local usable = G.ROOM.T.w - (margin or 1.0)
     if usable <= 0 then return 1 end
@@ -969,7 +996,7 @@ end
 --meant for Cash Out, Next Round, Reroll and the shop's jokers. nil outside a
 --portrait run.
 function portrait_shelf_floor()
-    if not (G and G.F_PORTRAIT and G.jokers and G.jokers.T) then return nil end
+    if not (G and G.F_PORTRAIT_LAYOUT and G.jokers and G.jokers.T) then return nil end
     return G.jokers.T.y + G.jokers.T.h + (PORTRAIT_CONFIG.panel_shelf_gap or 0.4)
 end
 
@@ -980,13 +1007,17 @@ end
 PORTRAIT_LAYOUTS = {'classic', 'one_thumb', 'focus'}
 PORTRAIT_LAYOUT_NAMES = {'Classic', 'One-Thumb', 'Focus'}
 
+-- The app remains physically portrait; this selects the game's internal layout.
+PORTRAIT_DISPLAY_MODES = {'Portrait', 'Original Landscape'}
+
 -- Options > Graphics. The first follows fps_cap above; a lower cap is what saves
 -- battery, since every frame runs the background and CRT shaders over the screen.
 PORTRAIT_FPS_NAMES = {'Screen', '60', '30'}
 PORTRAIT_FPS_CAPS = {false, 60, 30}
 
 function portrait_layout()
-    local i = G and G.SETTINGS and G.SETTINGS.portrait_layout or 1
+    if not (G and G.F_PORTRAIT_LAYOUT) then return 'classic' end
+    local i = G.SETTINGS and G.SETTINGS.portrait_layout or 1
     return PORTRAIT_LAYOUTS[i] or 'classic'
 end
 
@@ -1004,14 +1035,14 @@ end
 --How much larger the hand's cards are drawn: Swipe Only gives them the room
 --Play and Discard had. They ease back to size on leaving the hand.
 function portrait_hand_scale()
-    if G and G.F_PORTRAIT and G.F_SWIPE_ONLY and PORTRAIT_CONFIG.swipe_only then
+    if G and G.F_PORTRAIT_LAYOUT and G.F_SWIPE_ONLY and PORTRAIT_CONFIG.swipe_only then
         return PORTRAIT_CONFIG.swipe_only.hand_card_scale or 1
     end
     return 1
 end
 
 function apply_portrait_tooltip_fit(config)
-    if config and G and G.F_PORTRAIT then
+    if config and G and G.F_PORTRAIT_LAYOUT then
         if config.can_collide == nil then config.can_collide = false end
         if config.can_drag == nil then config.can_drag = false end
         if config.fit_to_room == nil then config.fit_to_room = true end
@@ -1032,7 +1063,7 @@ function apply_portrait_tooltip_fit(config)
 end
 
 function prepare_portrait_popup_fit(box)
-    if not (G and G.F_PORTRAIT and box) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT and box) then return end
 
     if box.config then
         apply_portrait_tooltip_fit(box.config)
@@ -1138,7 +1169,7 @@ local function fit_overlay_width(box)
 end
 
 function portrait_fit_overlay(box)
-    if not (G and G.F_PORTRAIT and box and box.UIRoot and G.TILESCALE and G.TILESIZE) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT and box and box.UIRoot and G.TILESCALE and G.TILESIZE) then return end
     fit_overlay_width(box)
     lift_overlay(box)
 end
@@ -1146,7 +1177,7 @@ end
 function get_portrait_room_fit_delta(box, opts)
     opts = opts or {}
 
-    if not (G and G.F_PORTRAIT and G.ROOM and G.ROOM.T and box and box.T) then
+    if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and box and box.T) then
         return 0, 0
     end
 
@@ -1193,7 +1224,7 @@ function get_portrait_room_fit_delta(box, opts)
 end
 
 function fit_portrait_side_tooltip(box, parent)
-    if not (G and G.F_PORTRAIT and G.ROOM and G.ROOM.T and box and box.T and parent) then return end
+    if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and box and box.T and parent) then return end
 
     local padding = (PORTRAIT_CONFIG and PORTRAIT_CONFIG.tooltip_screen_padding) or 0.12
     if box.T.x < padding then
@@ -1222,7 +1253,7 @@ end
 function get_portrait_side_tooltip_config(parent)
     local align = 'cl'
     local offset = {x = -0.03, y = 0}
-    if G and G.F_PORTRAIT and G.ROOM and G.ROOM.T and parent and parent.T then
+    if G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and parent and parent.T then
         local parent_cx = parent.T.x + parent.T.w/2
         if parent_cx < G.ROOM.T.w/2 then
             align = 'cr'
@@ -1243,7 +1274,7 @@ function get_portrait_top_popup_config(sprite, opts)
     opts = opts or {}
     local parent = opts.parent or sprite
 
-    if not (G and G.F_PORTRAIT and G.ROOM and G.ROOM.T and sprite and sprite.T) then
+    if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T and sprite and sprite.T) then
         -- Landscape / fallback: original side placement
         return {align = 'cl', offset = {x = -0.1, y = 0}, parent = parent}
     end

@@ -882,7 +882,27 @@ function portrait_place_areas()
   return true
 end
 
--- ===========================================================================
+--Place the portrait HUD only after its final UIBox width has been measured.
+--ROOM is a Node (not a Moveable role major), so the vanilla portrait path
+--intentionally positions the HUD directly rather than relying on role offsets.
+function portrait_position_run_hud(hud)
+  hud = hud or (G and G.HUD)
+  if not (G and G.F_PORTRAIT_LAYOUT and G.ROOM and G.ROOM.T
+          and hud and not hud.REMOVED and hud.T and hud.VT) then return end
+
+  local x = G.ROOM.T.x + (G.ROOM.T.w - hud.T.w) / 2
+  local changed = math.abs((hud.T.x or 0) - x) > 0.001
+      or math.abs((hud.VT.x or 0) - x) > 0.001
+  if changed then
+    hud.T.x, hud.VT.x = x, x
+    if hud.velocity then hud.velocity.x = 0 end
+    -- Re-sync the child UI tree only when the HUD's world position changes.
+    if hud.UIRoot and hud.UIRoot.initialize_VT then hud.UIRoot:initialize_VT() end
+  end
+  hud._portrait_position_passes = (hud._portrait_position_passes or 0) + 1
+  hud._portrait_position_last_x = x
+end
+
 -- Switching styles in a run
 -- ===========================================================================
 
@@ -891,9 +911,11 @@ end
 --once. Boxes anchored to the old HUD (blind prompt, shop sign) are moved to
 --the new one.
 function portrait_rebuild_HUD()
-  if not (G.F_PORTRAIT and G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind and G.GAME and G.GAME.blind) then return end
+  if not (G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind and G.GAME and G.GAME.blind) then return end
+  local is_portrait = not not G.F_PORTRAIT_LAYOUT
+  local had_hand_preview = G.hand_preview ~= nil
 
-  --The blind sprite lives in the panel; removing the panel would remove it.
+  -- Keep the active Blind object alive while replacing the HUD in either direction.
   local function detach(node)
     if node.config and node.config.object == G.GAME.blind then node.config.object = nil end
     for _, child in pairs(node.children or {}) do detach(child) end
@@ -907,22 +929,37 @@ function portrait_rebuild_HUD()
   G.HUD:remove()
   G.HUD_blind:remove()
   portrait_remove_dock()
+  if G.hand_preview then G.hand_preview:remove(); G.hand_preview = nil end
 
+  local row_align = is_portrait and 'tm' or 'cli'
+  local row_offset = is_portrait and {x = 0, y = 0} or {x = -0.7, y = 0}
+  -- Keep the proven upstream split: the portrait HUD is aligned directly to
+  -- ROOM and positioned from ROOM's measured width; landscape uses ROOM_ATTACH.
+  local row_major = is_portrait and G.ROOM or G.ROOM_ATTACH
   G.HUD = UIBox{
-    definition = create_UIBox_HUD_vertical(),
-    config = {align = 'tm', offset = {x = 0, y = 0}, major = G.ROOM}
+    definition = is_portrait and create_UIBox_HUD_vertical() or create_UIBox_HUD(),
+    config = {align = row_align, offset = row_offset, major = row_major}
   }
-  G.HUD.T.y = 0.2
-  G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
+  if is_portrait then
+    G.HUD.T.y = 0.2
+    G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
+  end
 
   local row_blind = G.HUD:get_UIE_by_ID('row_blind')
   G.HUD_blind = UIBox{
     definition = create_UIBox_HUD_blind(),
-    config = {major = G.HUD:get_UIE_by_ID(major_id) or row_blind, align = 'cm', offset = {x = 0, y = blind_offset_y}, bond = 'Weak'}
+    config = {
+      major = G.HUD:get_UIE_by_ID(major_id) or row_blind,
+      align = 'cm',
+      offset = {x = 0, y = is_portrait and blind_offset_y or -10},
+      bond = 'Weak'
+    }
   }
-  for _, id in ipairs({'HUD_blind_debuff_1', 'HUD_blind_debuff_2'}) do
-    local node = G.HUD_blind:get_UIE_by_ID(id)
-    if node then node.config.func = 'portrait_HUD_blind_debuff' end
+  if is_portrait then
+    for _, id in ipairs({'HUD_blind_debuff_1', 'HUD_blind_debuff_2'}) do
+      local node = G.HUD_blind:get_UIE_by_ID(id)
+      if node then node.config.func = 'portrait_HUD_blind_debuff' end
+    end
   end
 
   G.hand_text_area = {
@@ -939,10 +976,10 @@ function portrait_rebuild_HUD()
   }
   G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
   G.HUD:recalculate()
+  if is_portrait then portrait_position_run_hud(G.HUD) end
   G.HUD_blind:recalculate()
 
-  if G.hand_preview then
-    G.hand_preview:remove()
+  if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
     G.hand_preview = UIBox{
       definition = create_UIBox_hand_preview(),
       config = {align = 'tm', offset = {x = 0, y = PORTRAIT_CONFIG.hand_preview.y_offset or -0.65}, major = G.hand, bond = 'Weak'}
@@ -951,8 +988,7 @@ function portrait_rebuild_HUD()
     G.hand_preview.states.visible = false
   end
 
-  --Boxes draw in the order they were made, so these go back on top of the
-  --new HUD as well.
+  -- Boxes anchored to the old blind row must follow the replacement row.
   for _, box in ipairs({G.blind_prompt_box, G.SHOP_SIGN}) do
     if box and not box.REMOVED and row_blind then
       box:set_alignment({major = row_blind})
@@ -963,7 +999,6 @@ function portrait_rebuild_HUD()
     end
   end
 end
-
 --Where Classic's joker shelf sits: its tuned jokers_y on phones. On a short
 --room (tablets, 16:10) that left the shop no room under the shelf and pushed
 --its bottom row off screen, so there the shelves start under the HUD.
@@ -979,7 +1014,7 @@ end
 --whose hand sits higher or lower than Classic's moves them by the
 --difference, so they keep Classic's place at the bottom of the screen.
 function portrait_panel_drop()
-  if not G.F_PORTRAIT then return 0 end
+  if not G.F_PORTRAIT_LAYOUT then return 0 end
   local grown = G.hand and G.hand.portrait_base_h and (G.hand.T.h - G.hand.portrait_base_h) or 0
   return get_hand_base_offset() - PORTRAIT_CONFIG.hand_base_offset + grown
 end
@@ -1028,14 +1063,52 @@ end
 --After a style switch the hand has moved; put an open shop or blind select
 --back where their builders would have. set_screen_positions leaves the hand
 --short of its rest, and a panel placed from there ended 0.35 too low.
+local function portrait_realign_box(box)
+  if not (box and not box.REMOVED and box.alignment) then return end
+  if box.align_to_major then box:align_to_major() end
+  if box.hard_set_VT then box:hard_set_VT() end
+end
+
 function portrait_reflow_panels()
-  if not G.F_PORTRAIT or not G.hand then return end
+  if not G.F_PORTRAIT_LAYOUT or not G.hand then return end
   G.hand.T.y = portrait_hand_rest_y()
-  if G.shop and not G.shop.REMOVED and G.STATE == G.STATES.SHOP then
+  if G.shop and not G.shop.REMOVED and G.shop.alignment and G.shop.alignment.offset and G.STATE == G.STATES.SHOP then
     G.shop.alignment.offset.y = portrait_shop_offset()
+    portrait_realign_box(G.shop)
   end
-  if G.blind_select and not G.blind_select.REMOVED and G.STATE == G.STATES.BLIND_SELECT then
+  if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.blind_select.alignment.offset and G.STATE == G.STATES.BLIND_SELECT then
     G.blind_select.alignment.offset.y = portrait_blind_select_offset()
+    portrait_realign_box(G.blind_select)
+  end
+end
+
+--Leaving portrait previously restored panel offsets inside portrait_rebuild_HUD,
+--before set_screen_positions put the hand and joker shelf back in landscape
+--coordinates. The blind-select formula therefore used stale hand coordinates.
+--Run this only after the card areas have their final landscape positions.
+function portrait_restore_landscape_panels()
+  if not (G and not G.F_PORTRAIT_LAYOUT) then return end
+
+  if G.shop and not G.shop.REMOVED and G.shop.alignment then
+    G.shop.alignment.offset.y = -5.3
+    portrait_realign_box(G.shop)
+  end
+  if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.blind_select.alignment.offset and G.blind_select.T and G.hand and G.jokers then
+    G.blind_select.alignment.offset.y = 0.8 - (G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
+    portrait_realign_box(G.blind_select)
+  end
+  if G.round_eval and not G.round_eval.REMOVED and G.round_eval.alignment then
+    G.round_eval.alignment.offset.y = -7.8
+    portrait_realign_box(G.round_eval)
+  end
+  if G.HUD_tags and G.HUD_tags[1] then
+    G.HUD_tags[1]:set_alignment({
+      type = 'bri', offset = {x = 0.7, y = 0},
+      xy_bond = 'Weak', major = G.ROOM_ATTACH
+    })
+    for _, tag in ipairs(G.HUD_tags) do
+      portrait_realign_box(tag)
+    end
   end
 end
 
@@ -1044,7 +1117,7 @@ end
 --the first tag instead, so no tag ever sits on the HUD. Re-run whenever a tag
 --comes or goes and when the shelves move.
 function portrait_arrange_tags()
-  if not (G.F_PORTRAIT and G.HUD_tags and G.HUD_tags[1] and G.jokers and G.jokers.T) then return end
+  if not (G.F_PORTRAIT_LAYOUT and G.HUD_tags and G.HUD_tags[1] and G.jokers and G.jokers.T) then return end
   local align, offset = get_portrait_first_tag_align()
   local tag_h = G.HUD_tags[1].T.h > 0 and G.HUD_tags[1].T.h or 0.9
   local first_top = G.jokers.T.y + G.jokers.T.h
@@ -1062,11 +1135,210 @@ function portrait_arrange_tags()
   end
 end
 
+--Fold6 display classification uses LÖVE's DPI-scaled logical dimensions.
+--The cover's short edge is below 600dp; the unfolded inner display's short
+--edge is above it. Unlike w > h, the minimum dimension remains stable when the
+--cover itself is switched to landscape or when the device rotates by 180°.
+function portrait_fold6_is_inner_display(w, h)
+  if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then return false end
+  if type(w) ~= 'number' or type(h) ~= 'number' then
+    w, h = love.graphics.getDimensions()
+  end
+  return math.min(w, h) >= 600
+end
+
+--Request one sensor-locked orientation from SDL.
+--The Fold6 SDLActivity patch selects the requested orientation from width/height
+--and does not depend on the resizable flag. One setMode call is sufficient:
+--LÖVE 11.5 recreates its SDL window and GL context on every setMode call, so
+--the former false->true resizable toggle recreated the native window twice.
+function portrait_request_android_orientation(mode)
+  if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then
+    return true
+  end
+  if portrait_fold6_is_inner_display() then return true end
+
+  local width, height = mode == 2 and 1280 or 720, mode == 2 and 720 or 1280
+  local flags = {}
+  local got_mode, _, _, current_flags = pcall(love.window.getMode)
+  if got_mode and type(current_flags) == 'table' then
+    for key, value in pairs(current_flags) do flags[key] = value end
+  end
+  flags.fullscreen = true
+  flags.fullscreentype = 'desktop'
+  flags.usedpiscale = true
+  -- Keep the original fixed-window request. The patched SDLActivity selects
+  -- sensor portrait/landscape from width/height even when resizable is false.
+  -- A single setMode already reaches Android_CreateWindow -> setOrientation.
+  flags.resizable = false
+
+  local started_at = love.timer.getTime()
+  local ok, result = pcall(love.window.setMode, width, height, flags)
+  if PORTRAIT_SWITCH_METRICS and PORTRAIT_SWITCH_METRICS.active then
+    PORTRAIT_SWITCH_METRICS.orientation_request_ms = (love.timer.getTime() - started_at) * 1000
+    PORTRAIT_SWITCH_METRICS.orientation_finished_at = love.timer.getTime()
+  end
+  if not ok or result == false then
+    return false, tostring(result or 'Unable to set the Android window mode')
+  end
+  return true
+end
+
+--Capture the exact active run before rebuilding the scene after an orientation
+--or portrait-layout change. This mirrors the rollback system's proven save_run
+-- + copy_table sequence, but keeps the fresh snapshot queued as the normal run
+-- save as well, so a process exit during the transition cannot fall back to an
+-- older save.jkr.
+function portrait_capture_run_for_layout_reload()
+  if not (G and G.STAGE == G.STAGES.RUN and G.GAME and G.GAME.blind and G.GAME.selected_back) then
+    return nil, 'The current scene is not an active run'
+  end
+
+  local capture_started_at = love.timer.getTime()
+  G.ARGS = G.ARGS or {}
+  local previous_save = G.ARGS.save_run
+  local previous_culled = G.culled_table
+  G.ARGS.save_run = nil
+  G.culled_table = nil
+
+  local ok, snapshot = pcall(function()
+    save_run()
+    if type(G.ARGS.save_run) ~= 'table' then
+      error('save_run did not produce a fresh snapshot')
+    end
+
+    -- save_run() has already produced a detached plain-data snapshot via
+    -- recursive_table_cull(). Copying it again duplicates the entire run tree
+    -- synchronously on the UI thread without adding snapshot isolation.
+    local saved = G.ARGS.save_run
+    if type(saved) ~= 'table'
+       or type(saved.GAME) ~= 'table'
+       or type(saved.cardAreas) ~= 'table'
+       or type(saved.BLIND) ~= 'table'
+       or type(saved.BACK) ~= 'table'
+       or saved.STATE == nil then
+      error('The active run snapshot is incomplete')
+    end
+    return saved
+  end)
+
+  if PORTRAIT_SWITCH_METRICS and PORTRAIT_SWITCH_METRICS.active then
+    PORTRAIT_SWITCH_METRICS.snapshot_ms = (love.timer.getTime() - capture_started_at) * 1000
+  end
+  if not ok or not snapshot then
+    G.ARGS.save_run = previous_save
+    G.culled_table = previous_culled
+    if PORTRAIT_SWITCH_METRICS then
+      PORTRAIT_SWITCH_METRICS.active = false
+      PORTRAIT_SWITCH_METRICS.failed_stage = 'snapshot'
+    end
+    return nil, tostring(snapshot or 'Unable to capture the active run')
+  end
+
+  -- Keep the same fresh snapshot for the save thread and for start_run().
+  G.ARGS.save_run = snapshot
+  G.culled_table = snapshot
+  G.FILE_HANDLER = G.FILE_HANDLER or {}
+  G.FILE_HANDLER.run = true
+  G.FILE_HANDLER.update_queued = true
+  G.FILE_HANDLER.force = true
+  return snapshot
+end
+
+--Re-enter the active run through Balatro's native load-from-save path. That
+--path calls delete_run(), prep_stage(), creates new card areas/HUD/backdrop,
+--then restores every saved CardArea, tag, blind and game state. The settings
+--are already updated, so prep_stage/love.resize builds the new orientation.
+function portrait_restart_scene_for_layout_change(snapshot)
+  if not G then return false, 'Game state is unavailable' end
+
+  if G.STAGE == G.STAGES.RUN then
+    local err
+    if not snapshot then snapshot, err = portrait_capture_run_for_layout_reload() end
+    if not snapshot then return false, err end
+    -- Keep the original game transition animation. Optimize only the
+    -- pre-transition work (snapshot + Android surface/orientation wait).
+    local metrics = PORTRAIT_SWITCH_METRICS
+    local queued_at = love.timer.getTime()
+    local ok, err = pcall(G.FUNCS.start_run, nil, {
+      savetext = snapshot,
+      from_portrait_layout = true
+    })
+    if metrics and metrics.active then
+      metrics.restart_enqueue_ms = (love.timer.getTime() - queued_at) * 1000
+      metrics.pre_transition_ms = (love.timer.getTime() - metrics.started_at) * 1000
+      metrics.start_run_queued_at = love.timer.getTime()
+    end
+    if not ok then return false, tostring(err) end
+    return true
+  end
+
+  if G.STAGE == G.STAGES.MAIN_MENU then
+    -- No in-memory run exists on the main menu. Recreate the menu scene using
+    -- the same transition as the vanilla Main Menu button; save.jkr is left
+    -- untouched so Continue remains available.
+    G.FUNCS.go_to_menu()
+    return true
+  end
+
+  return false, 'This screen cannot be safely rebuilt from an active run save'
+end
+
+--Resize and realign the felt/background sprite when the logical room changes
+--between portrait and the original landscape viewport. Its dimensions are
+--fixed when start_run creates it, so changing only ROOM.T left old black bands
+--or a cropped background behind the new layout.
+function portrait_refresh_backdrop()
+  local bg = G and G.SPLASH_BACK
+  if not (bg and not bg.REMOVED and bg.T and G.ROOM and G.ROOM.T) then return end
+  bg.T.w = G.ROOM.T.w + 60
+  bg.T.h = G.ROOM.T.h + 22
+  if bg.VT then
+    bg.VT.w = bg.T.w
+    bg.VT.h = bg.T.h
+  end
+  -- The main-menu backdrop covers the physical display, including the top
+  -- inset. ROOM_ATTACH is shifted down to keep UI clear of the status area;
+  -- cancel that shift only for the backdrop, not for the menu controls.
+  if G.STAGE == G.STAGES.MAIN_MENU and G.ROOM_ATTACH and bg.alignment
+     and bg.alignment.major == G.ROOM_ATTACH then
+    bg.alignment.offset = bg.alignment.offset or {x = 0, y = 0}
+    bg.alignment.offset.y = G.F_PORTRAIT_LAYOUT and -(G.ROOM_ATTACH.T.y or 0) or 0
+  end
+  if bg.align_to_major then bg:align_to_major() end
+  if bg.hard_set_VT then bg:hard_set_VT() end
+end
+
+--One live-layout transaction for both display-direction changes and the
+--Classic / One-Thumb / Focus selector. Rebuild the HUD first: One-Thumb's
+--score dock and Focus's blind panel are created by their HUD builders. Only
+--then place the card areas against the new HUD and rebuild the button bar.
+function portrait_apply_live_layout()
+  if not G then return end
+  if G.STAGE == G.STAGES.RUN then
+    portrait_rebuild_HUD()
+    if set_screen_positions then set_screen_positions() end
+    if G.F_PORTRAIT_LAYOUT then
+      portrait_reflow_panels()
+      portrait_arrange_tags()
+    else
+      portrait_restore_landscape_panels()
+    end
+    if G.buttons and rebuild_buttons_uibox then rebuild_buttons_uibox() end
+  elseif G.STAGE == G.STAGES.MAIN_MENU then
+    if G.MAIN_MENU_UI then G.MAIN_MENU_UI:remove(); G.MAIN_MENU_UI = nil end
+    if G.PROFILE_BUTTON then G.PROFILE_BUTTON:remove(); G.PROFILE_BUTTON = nil end
+    if G.LANGUAGE_BUTTON then G.LANGUAGE_BUTTON:remove(); G.LANGUAGE_BUTTON = nil end
+    if set_main_menu_UI then set_main_menu_UI() end
+  end
+  portrait_refresh_backdrop()
+end
+
 --Sets the text of a row to config.text_scale once the box is built, for rows
 --whose label line has to stay exactly as vanilla wrote it (another mod's
 --Lovely patch anchors on that line).
 G.FUNCS.portrait_text_scale = function(e)
-  if e.config.text_scaled or not G.F_PORTRAIT then return end
+  if e.config.text_scaled or not G.F_PORTRAIT_LAYOUT then return end
   for _, child in ipairs(e.children) do
     if child.UIT == G.UIT.T and child.config then child.config.scale = e.config.text_scale end
   end
@@ -1138,15 +1410,127 @@ local function lift_tutorial(ot)
   end
 end
 
+-- The stock Game:init_window creates WINDOWTRANS with only logical game
+-- bounds. The Android/LÖVE resize callback may be deferred until the surface
+-- settles, but update_canvas_juice reads real_window_w/h during the first
+-- Game:update. Fill only missing values before entering the original update;
+-- the stabilized resize path will replace them with the final dimensions.
+local function portrait_ensure_real_window_dimensions()
+  if not (G and G.WINDOWTRANS) then return end
+  local width, height = love.graphics.getDimensions()
+  if not G.WINDOWTRANS.real_window_w or G.WINDOWTRANS.real_window_w <= 0 then
+    G.WINDOWTRANS.real_window_w = width
+  end
+  if not G.WINDOWTRANS.real_window_h or G.WINDOWTRANS.real_window_h <= 0 then
+    G.WINDOWTRANS.real_window_h = height
+  end
+
+  -- The first Android resize may have fired before G.ROOM existed and was
+  -- discarded by _portrait_apply_resize. update_canvas_juice runs before
+  -- love.draw can consume a deferred resize, so seed the original room
+  -- transform here and ask the draw path to apply the real viewport next.
+  if G.ROOM and G.ROOM.T and not G.ROOM_ORIG then
+    G.ROOM_ORIG = {
+      x = G.ROOM.T.x or 0,
+      y = G.ROOM.T.y or 0,
+      r = G.ROOM.T.r or 0
+    }
+    if love.system.getOS() == 'Android' and not G.PORTRAIT_RESIZE_PENDING then
+      G.PORTRAIT_RESIZE_PENDING = {
+        w = width, h = height, stable_frames = 2
+      }
+    end
+  end
+end
+
+local portrait_game_start_run = Game.start_run
+function Game:start_run(args)
+  local metrics = PORTRAIT_SWITCH_METRICS
+  local is_layout_reload = args and args.from_portrait_layout and metrics and metrics.active
+  local started_at = is_layout_reload and love.timer.getTime() or nil
+  if is_layout_reload then
+    metrics.queue_to_start_run_ms = (started_at - (metrics.start_run_queued_at or started_at)) * 1000
+  end
+  portrait_game_start_run(self, args)
+  if is_layout_reload then
+    metrics.game_start_run_ms = (love.timer.getTime() - started_at) * 1000
+    metrics.game_start_run_finished_at = love.timer.getTime()
+    metrics.awaiting_first_frame = true
+  end
+end
+
 local portrait_game_update = Game.update
 function Game:update(dt)
+  portrait_ensure_real_window_dimensions()
   portrait_game_update(self, dt)
+  local switch_metrics = PORTRAIT_SWITCH_METRICS
+  if switch_metrics and switch_metrics.awaiting_first_frame
+     and G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind then
+    switch_metrics.first_frame_total_ms = (love.timer.getTime() - switch_metrics.started_at) * 1000
+    switch_metrics.completed_at = love.timer.getTime()
+    switch_metrics.awaiting_first_frame = nil
+    switch_metrics.active = false
+  end
+  -- A cover orientation change is asynchronous. Wait until Android has
+  -- delivered the target aspect ratio and the resize debounce has completed,
+  -- then rebuild the scene from the snapshot captured before requesting it.
+  local pending_layout = G.PORTRAIT_LAYOUT_RELOAD_PENDING
+  if pending_layout then
+    local w, h = love.graphics.getDimensions()
+    local target_reached = pending_layout.mode == 2 and w > h or pending_layout.mode ~= 2 and h > w
+    if target_reached and not G.PORTRAIT_RESIZE_PENDING then
+      if pending_layout.last_w == w and pending_layout.last_h == h then
+        pending_layout.stable_frames = (pending_layout.stable_frames or 0) + 1
+      else
+        pending_layout.last_w, pending_layout.last_h = w, h
+        pending_layout.stable_frames = 1
+      end
+    else
+      pending_layout.stable_frames = 0
+      pending_layout.last_w, pending_layout.last_h = w, h
+    end
+
+    local scene_ready = G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU
+    if pending_layout.stable_frames >= 2 and scene_ready then
+      G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+      if switch_metrics and switch_metrics.active then
+        switch_metrics.surface_wait_ms = (love.timer.getTime() - (switch_metrics.orientation_finished_at or pending_layout.started_at)) * 1000
+      end
+      local ok, err = portrait_restart_scene_for_layout_change(pending_layout.snapshot)
+      if not ok then
+        G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
+        G:save_settings()
+        pcall(portrait_request_android_orientation, pending_layout.previous_mode)
+        print('PORTRAIT LAYOUT RELOAD ABORTED: ' .. tostring(err))
+      end
+    elseif love.timer.getTime() - pending_layout.started_at > 10 then
+      G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+      G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
+      G:save_settings()
+      pcall(portrait_request_android_orientation, pending_layout.previous_mode)
+      print('PORTRAIT ORIENTATION CHANGE TIMED OUT; previous mode restored')
+    end
+  end
+
+  -- A Fold6 cover/inner transition changes the Android configuration class.
+  -- Re-enter the same saved run after the new surface dimensions have settled.
+  if G.PORTRAIT_FOLD_RELOAD_PENDING
+     and not G.PORTRAIT_LAYOUT_RELOAD_PENDING
+     and not G.PORTRAIT_RESIZE_PENDING
+     and (G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU) then
+    G.PORTRAIT_FOLD_RELOAD_PENDING = nil
+    local ok, err = portrait_restart_scene_for_layout_change()
+    if not ok then
+      G.PORTRAIT_FOLD_RELOAD_PENDING = true
+      print('FOLD DISPLAY RELOAD DEFERRED: ' .. tostring(err))
+    end
+  end
   local ot = G.OVERLAY_TUTORIAL
-  if G.F_PORTRAIT and ot and not ot.REMOVED then
+  if G.F_PORTRAIT_LAYOUT and ot and not ot.REMOVED then
     stack_tutorial(ot)
     lift_tutorial(ot)
   end
-  if G.F_PORTRAIT and ot and not ot.REMOVED and not ot.portrait_covered and ot.UIRoot and G.ROOM and G.ROOM.T then
+  if G.F_PORTRAIT_LAYOUT and ot and not ot.REMOVED and not ot.portrait_covered and ot.UIRoot and G.ROOM and G.ROOM.T then
     ot.portrait_covered = true
     local need_h = G.ROOM.T.h + 2 * (math.abs(ot.alignment and ot.alignment.offset and ot.alignment.offset.y or 0) + 2)
     if ot.T.h < need_h then
@@ -1154,6 +1538,12 @@ function Game:update(dt)
       ot.UIRoot.config.minw = math.max(ot.T.w, G.ROOM.T.w + 4)
       ot:recalculate()
     end
+  end
+
+  -- Final pass after the original update, resize handling and all portrait
+  -- layout work. Some late UI initialization paths can restore a stale x.
+  if G.F_PORTRAIT_LAYOUT and G.HUD and portrait_position_run_hud then
+    portrait_position_run_hud(G.HUD)
   end
 end
 
@@ -1180,7 +1570,7 @@ local function wrap_smods_badge()
       return
     end
     local badge = e.children[1]
-    if G.F_PORTRAIT and badge and badge ~= had and e.UIBox and e.UIBox.T then
+    if G.F_PORTRAIT_LAYOUT and badge and badge ~= had and e.UIBox and e.UIBox.T then
       local max_w = e.UIBox.T.w - 0.2
       local function clamp(node)
         if node.config and node.config.minw and node.config.minw > max_w then node.config.minw = max_w end
@@ -1197,6 +1587,6 @@ portrait_wrap_smods_badge = wrap_smods_badge
 
 local game_ease_value = ease_value
 function ease_value(ref_table, ...)
-  if G.F_PORTRAIT and G.HUD and G.HUD.alignment and ref_table == G.HUD.alignment.offset then return end
+  if G.F_PORTRAIT_LAYOUT and G.HUD and G.HUD.alignment and ref_table == G.HUD.alignment.offset then return end
   return game_ease_value(ref_table, ...)
 end

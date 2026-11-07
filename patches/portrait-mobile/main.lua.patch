@@ -1,26 +1,14 @@
 --- a/main.lua
 +++ b/main.lua
-@@ -1,9 +1,51 @@
+@@ -1,9 +1,49 @@
 -if (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
 +if (love.system.getOS() == 'OS X' ) and (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
  
-+local function _force_android_portrait_hints()
-+    if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then return end
-+    if not (love and love.window and love.window.setMode) then return end
  
-+    pcall(function()
-+        if love.window.setHint then
-+            love.window.setHint("screenorientation", "portrait")
-+            love.window.setHint("screenorientation", "fixed")
-+        end
-+    end)
-+
-+    pcall(function()
-+        local w, h, flags = love.window.getMode()
-+        flags = flags or {}
-+        flags.resizable = false
-+        love.window.setMode(w, h, flags)
-+    end)
++local function _force_android_portrait_hints()
++    -- System orientation is selected by SDLActivity from
++    -- Configuration.smallestScreenWidthDp: Fold inner = landscape,
++    -- cover = portrait. Do not force the old portrait-only SDL hint.
 +end
 +
 +local function _logcat(tag, msg)
@@ -46,6 +34,16 @@
 +    end
 +    return tx, ty, tdx, tdy
 +end
++
++local function _transform_rotated_input(x, y, dx, dy)
++    if not (G and G.F_ROTATED_LANDSCAPE) then return x, y, dx, dy end
++    local screen_w = G.PORTRAIT_SCREEN_W or love.graphics.getWidth()
++    -- mousepressed/mousereleased carry only x/y/button/touch. Their deltas are
++    -- nil; rotate the deltas only for mousemoved, where dx/dy are numeric.
++    local rotated_dx = type(dy) == 'number' and dy or nil
++    local rotated_dy = type(dx) == 'number' and -dx or nil
++    return y, screen_w - x, rotated_dx, rotated_dy
++end
  require "engine/object"
  require "bit"
  require "engine/string_packer"
@@ -53,7 +51,7 @@
  require "engine/controller"
  require "back"
  require "tag"
-@@ -20,6 +62,7 @@
+@@ -20,6 +60,7 @@
  require "functions/state_events"
  require "functions/common_events"
  require "functions/button_callbacks"
@@ -61,7 +59,7 @@
  require "functions/misc_functions"
  require "functions/test_functions"
  require "card"
-@@ -32,203 +75,362 @@
+@@ -32,203 +73,418 @@
  
  math.randomseed( G.SEED )
  
@@ -250,7 +248,14 @@
 -	if love.platform.isArcade and love.platform.isArcade() then
 -		splashVideo = love.graphics.newVideo("resources/videos/"..getSplashVideoFileName())
 -	end
-+	_force_android_portrait_hints()
++	local initial_screen_w, initial_screen_h = love.graphics.getDimensions()
++	G.F_FOLD_INNER = portrait_fold6_is_inner_display(initial_screen_w, initial_screen_h)
++	G.F_ROTATED_LANDSCAPE = false
++	-- Settings are loaded by G:start_up below. Until then the cover defaults
++	-- to the portrait layout; the persisted choice is applied immediately after
++	-- startup and the menu/run is rebuilt if it differs.
++	G.F_PORTRAIT_LAYOUT = os_name == 'Android' and not G.F_FOLD_INNER
++		or (os_name == 'iOS' and initial_screen_h > initial_screen_w)
  
 -	if splashVideo then
 -		shouldSplash = true
@@ -415,6 +420,28 @@
 +
 +	G:start_up()
 +	local desktop_os = love.system.getOS()
++	if desktop_os == 'Android' then
++		local screen_w, screen_h = love.graphics.getDimensions()
++		G.F_FOLD_INNER = portrait_fold6_is_inner_display(screen_w, screen_h)
++		G.F_ROTATED_LANDSCAPE = false
++		local startup_layout = not not G.F_PORTRAIT_LAYOUT
++		local display_mode = G.SETTINGS and G.SETTINGS.portrait_display_mode or 1
++		G.F_PORTRAIT_LAYOUT = not G.F_FOLD_INNER and display_mode == 1
++		if not G.F_FOLD_INNER then
++			local orientation_ok, orientation_err = portrait_request_android_orientation(display_mode)
++			if not orientation_ok then print('ANDROID ORIENTATION REQUEST FAILED: '..tostring(orientation_err)) end
++			local orientation_mismatch = (display_mode == 2 and screen_w <= screen_h)
++				or (display_mode ~= 2 and screen_h <= screen_w)
++			if startup_layout ~= G.F_PORTRAIT_LAYOUT or orientation_mismatch then
++				G.PORTRAIT_LAYOUT_RELOAD_PENDING = {
++					mode = display_mode, previous_mode = display_mode,
++					started_at = love.timer.getTime(), stable_frames = 0
++				}
++			end
++		end
++	elseif desktop_os == 'iOS' then
++		G.F_PORTRAIT_LAYOUT = love.graphics.getHeight() > love.graphics.getWidth()
++	end
 +	if desktop_os == 'OS X' or desktop_os == 'Windows' then
 +		local st = nil
 +		if desktop_os == 'OS X' then
@@ -483,14 +510,12 @@
 +        local os_name = love.system.getOS()
 +        if (os_name == 'Android' or os_name == 'iOS') and G and G.ROOM then
 +            local w, h = love.graphics.getDimensions()
-+            if w > 0 and h > 0 and G.TILESCALE and h > w then
++            if w > 0 and h > 0 and G.TILESCALE then
 +                love.graphics.setScissor()
 +                love.graphics.origin()
 +                love.graphics.clear(0, 0, 0, 1)
-+                if G.CANVAS then
-+                    G.CANVAS:release()
-+                    G.CANVAS = nil
-+                end
++                -- Keep the previous complete canvas alive until the debounced
++                -- Android resize has a stable target surface and can replace it.
 +                love.resize(w, h)
 +            end
 +        end
@@ -498,7 +523,33 @@
 +    G:update(dt)
  end
  
++local _portrait_apply_resize
  function love.draw()
++    local os_name = love.system.getOS()
++    -- The first Android resize can arrive before ROOM exists and be deferred.
++    -- In that case there is no old canvas for the normal resize/draw path to
++    -- use as a placeholder. Wait for a stable surface and initialize it before
++    -- entering Game:draw(), which assumes G.CANVAS is already available.
++    if (os_name == 'Android' or os_name == 'iOS') and G and G.ROOM and not G.CANVAS then
++        local screen_w, screen_h = love.graphics.getDimensions()
++        local pending = G.PORTRAIT_RESIZE_PENDING
++        if not pending or pending.w ~= screen_w or pending.h ~= screen_h then
++            pending = {w = screen_w, h = screen_h, stable_frames = 0}
++            G.PORTRAIT_RESIZE_PENDING = pending
++        else
++            pending.stable_frames = (pending.stable_frames or 0) + 1
++        end
++        if pending.stable_frames >= 2 and screen_w > 0 and screen_h > 0 and G.window_prev then
++            G.PORTRAIT_RESIZE_PENDING = nil
++            _portrait_apply_resize(screen_w, screen_h)
++        end
++        if not G.CANVAS then
++            love.graphics.origin()
++            love.graphics.setScissor()
++            love.graphics.clear(0, 0, 0, 1)
++            return
++        end
++    end
 -
 -	if splashVideo and not shouldSplash then
 -		-- Center the video on the screen
@@ -527,8 +578,37 @@
 +        local screen_h = love.graphics.getHeight()
 +        local canvas_w = G.CANVAS:getWidth() / (G.CANV_SCALE or 1)
 +        local canvas_h = G.CANVAS:getHeight() / (G.CANV_SCALE or 1)
-+        if math.abs(screen_w - canvas_w) > 2 or math.abs(screen_h - canvas_h) > 2 then
++        local expected_w = screen_w
++        local expected_h = screen_h
++        if math.abs(expected_w - canvas_w) > 2 or math.abs(expected_h - canvas_h) > 2 then
 +            love.resize(screen_w, screen_h)
++        end
++        local pending = G.PORTRAIT_RESIZE_PENDING
++        if pending then
++            if pending.w ~= screen_w or pending.h ~= screen_h then
++                pending.w, pending.h, pending.stable_frames = screen_w, screen_h, 0
++            else
++                pending.stable_frames = pending.stable_frames + 1
++            end
++            local waiting_for_requested_orientation = G.PORTRAIT_LAYOUT_RELOAD_PENDING
++                and ((G.PORTRAIT_LAYOUT_RELOAD_PENDING.mode == 2 and screen_w <= screen_h)
++                    or (G.PORTRAIT_LAYOUT_RELOAD_PENDING.mode ~= 2 and screen_h <= screen_w))
++            if pending.stable_frames >= 2 and not waiting_for_requested_orientation and G.ROOM then
++                G.PORTRAIT_RESIZE_PENDING = nil
++                _portrait_apply_resize(screen_w, screen_h)
++            else
++                -- Keep the last complete framebuffer scaled to the new surface
++                -- while Android finishes its fold/unfold configuration change.
++                love.graphics.origin()
++                love.graphics.setScissor()
++                love.graphics.setShader()
++                love.graphics.clear(0, 0, 0, 1)
++                love.graphics.setColor(1, 1, 1, 1)
++                love.graphics.draw(G.CANVAS, 0, 0, 0,
++                    screen_w / G.CANVAS:getWidth(),
++                    screen_h / G.CANVAS:getHeight())
++                return
++            end
 +        end
 +    end
 +	G:draw()
@@ -558,7 +638,7 @@
  	if not _RELEASE_MODE and G.keybind_mapping[key] then love.gamepadpressed(G.CONTROLLER.keyboard_controller, G.keybind_mapping[key])
  	else
  		G.CONTROLLER:set_HID_flags('mouse')
-@@ -237,14 +439,6 @@
+@@ -237,14 +493,6 @@
  end
  
  function love.keyreleased(key)
@@ -573,7 +653,7 @@
  	if not _RELEASE_MODE and G.keybind_mapping[key] then love.gamepadreleased(G.CONTROLLER.keyboard_controller, G.keybind_mapping[key])
  	else
  		G.CONTROLLER:set_HID_flags('mouse')
-@@ -252,6 +446,22 @@
+@@ -252,6 +500,22 @@
  	end
  end
  
@@ -596,7 +676,7 @@
  function love.gamepadpressed(joystick, button)
  	button = G.button_mapping[button] or button
  	G.CONTROLLER:set_gamepad(joystick)
-@@ -266,9 +476,43 @@
+@@ -266,9 +530,44 @@
      G.CONTROLLER:button_release(button)
  end
  
@@ -613,6 +693,7 @@
 +
  function love.mousepressed(x, y, button, touch)
 +    if _ignore_phantom_mouse(touch) then return end
++    x, y = _transform_rotated_input(x, y)
 +    _logcat("BALATRO_INPUT", string.format("MOUSEPRESSED: x=%s y=%s button=%s touch=%s", tostring(x), tostring(y), tostring(button), tostring(touch)))
 +    if not (G and G.CONTROLLER) then return end
 +
@@ -641,7 +722,7 @@
  		G.CONTROLLER:queue_L_cursor_press(x, y)
  	end
  	if button == 2 then
-@@ -277,47 +521,149 @@
+@@ -277,47 +576,151 @@
  end
  
  
@@ -655,7 +736,7 @@
 +    -- Swipe Only mode has no Play/Discard buttons, so gestures stay on there
 +    -- regardless of the gestures.enabled config.
 +    local gestures_on = gz and (gz.enabled or G.F_SWIPE_ONLY)
-+    if not (gestures_on and G.F_PORTRAIT) then return end
++    if not (gestures_on and G.F_PORTRAIT_LAYOUT) then return end
 +    local gs = G.CONTROLLER and G.CONTROLLER.gesture_start
 +    if G.CONTROLLER then G.CONTROLLER.gesture_start = nil end
 +    if not gs then return end
@@ -702,6 +783,7 @@
 +function love.mousereleased(x, y, button, touch)
 +    if _ignore_phantom_mouse(touch) then return end
 +    if not (G and G.CONTROLLER) then return end
++    x, y = _transform_rotated_input(x, y)
 +    if touch and G.CONTROLLER.touch_position then
 +        G.CONTROLLER.touch_position.x = x
 +        G.CONTROLLER.touch_position.y = y
@@ -720,6 +802,7 @@
  function love.mousemoved(x, y, dx, dy, istouch)
 -	if isTvOs then
 +    if _ignore_phantom_mouse(istouch) then return end
++    x, y, dx, dy = _transform_rotated_input(x, y, dx or 0, dy or 0)
 +    if not (G and G.CONTROLLER) then return end
 +    dx = dx or 0
 +    dy = dy or 0
@@ -805,7 +888,7 @@
  				local request = CHANNEL:demand()
  				if request then
  					https.request(request)
-@@ -333,7 +679,6 @@
+@@ -333,7 +736,6 @@
  			str = str:gsub("\n", "\r\n"):gsub("([^%w _%%%-%.~])", char_to_hex):gsub(" ", "+")
  			return str
  		end
@@ -813,7 +896,7 @@
  
  		local error = msg
  		local file = string.sub(msg, 0,  string.find(msg, ':'))
-@@ -351,7 +696,7 @@
+@@ -351,7 +753,7 @@
  				function_line = string.sub(l, string.find(l, 'in function')+12)..' line:'..function_line
  			end
  
@@ -822,7 +905,7 @@
  				trace = trace..l..'\n'
  			end
  		end
-@@ -370,39 +715,61 @@
+@@ -370,39 +772,61 @@
  		end
  	end
  
@@ -896,7 +979,7 @@
  	end
  
  	while true do
-@@ -411,16 +778,15 @@
+@@ -411,16 +835,15 @@
  		for e, a, b, c in love.event.poll() do
  			if e == "quit" then
  				return
@@ -920,15 +1003,16 @@
  			end
  		end
  
-@@ -434,51 +800,162 @@
+@@ -434,51 +857,211 @@
  end
  
- function love.resize(w, h)
+-function love.resize(w, h)
++_portrait_apply_resize = function(w, h)
++	if not G then return end
++	if not G.ROOM then G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}; return end
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
 -		h = w/1
-+	if not G or not G.ROOM then
-+		return
- 	end
+-	end
  
 -	--When the window is resized, this code resizes the Canvas, then places the 'room' or gamearea into the middle without streching it
 -	if w/h < G.window_prev.orig_ratio then
@@ -940,15 +1024,37 @@
 +	_force_android_portrait_hints()
 +
 +	local os_name = love.system.getOS()
-+	if (os_name == 'Android' or os_name == 'iOS') then
-+		if w > h then
-+			if not G.window_prev or not G.CANV_SCALE then return end
-+			if G.CANVAS then G.CANVAS:release() end
-+			G.CANVAS = love.graphics.newCanvas(w*G.CANV_SCALE, h*G.CANV_SCALE, {type = '2d', readable = true})
-+			if G.CANVAS then G.CANVAS:setFilter('linear', 'linear') end
-+			if G.CANVAS then G.CANVAS:setWrap('clampzero') end
-+			return
++	local physical_w, physical_h = w, h
++	local is_mobile = (os_name == 'Android' or os_name == 'iOS')
++	local old_fold_inner = not not G.F_FOLD_INNER
++	G.F_FOLD_INNER = portrait_fold6_is_inner_display(physical_w, physical_h)
++	G.F_ROTATED_LANDSCAPE = false
++	G.F_PORTRAIT = is_mobile or (h > w)
++	G.F_PORTRAIT_LAYOUT = (os_name == 'Android' and not G.F_FOLD_INNER
++		and (G.SETTINGS and G.SETTINGS.portrait_display_mode or 1) == 1)
++		or (os_name == 'iOS' and h > w)
++	if G.FOLD_LAYOUT_INITIALIZED and old_fold_inner ~= G.F_FOLD_INNER then
++		G.PORTRAIT_FOLD_RELOAD_PENDING = true
++	end
++	G.FOLD_LAYOUT_INITIALIZED = true
++	if old_fold_inner and not G.F_FOLD_INNER and os_name == 'Android' then
++		-- Android restores the Activity's last native cover orientation first.
++		-- Re-assert the game's persisted setting because the Activity field is
++		-- only an in-memory fallback and may be empty after a fresh process start.
++		local cover_mode = G.SETTINGS and G.SETTINGS.portrait_display_mode or 1
++		local orientation_ok, orientation_err = portrait_request_android_orientation(cover_mode)
++		if orientation_ok then
++			G.PORTRAIT_FOLD_RELOAD_PENDING = nil
++			G.PORTRAIT_LAYOUT_RELOAD_PENDING = {
++				mode = cover_mode, previous_mode = cover_mode,
++				started_at = love.timer.getTime(), stable_frames = 0
++			}
++		else
++			print('FOLD6 COVER ORIENTATION RESTORE FAILED: '..tostring(orientation_err))
 +		end
++	end
++	G.PORTRAIT_SCREEN_W, G.PORTRAIT_SCREEN_H = physical_w, physical_h
++	if is_mobile then
 +		G.F_PORTRAIT = true
  	else
 -		G.TILESCALE = G.window_prev.orig_scale*h/G.window_prev.h
@@ -970,7 +1076,7 @@
 -		else
 -			G.ROOM.T.y = G.ROOM_PADDING_H
 -			G.ROOM.T.x = (w/(G.TILESIZE*G.TILESCALE) - (G.ROOM.T.w+G.ROOM_PADDING_W))/2 + G.ROOM_PADDING_W/2
-+	if G.F_PORTRAIT then
++	if G.F_PORTRAIT_LAYOUT then
 +		local portrait_scale_factor = get_portrait_scale(w, h)
 +		G.TILESCALE = w / (G.TILE_W * portrait_scale_factor * G.TILESIZE)
 +
@@ -1038,6 +1144,10 @@
 +			G.ROOM.T.h = G.TILE_H
 +			G.ROOM_ATTACH.T.w = G.TILE_W
 +			G.ROOM_ATTACH.T.h = G.TILE_H
++			-- Restore the vanilla landscape anchor after portrait mode moved it
++			-- down by the phone safe-area inset.
++			G.ROOM_ATTACH.T.x = 0
++			G.ROOM_ATTACH.T.y = 0
 +
 +			if w/h < G.window_prev.orig_ratio then
 +				G.ROOM.T.x = G.ROOM_PADDING_W
@@ -1058,14 +1168,29 @@
 +		end
  	end
  
++
++	-- The room and its attachment node keep independent render transforms.
++	-- Leaving the old VT after changing aspect ratio left the backdrop at the
++	-- previous orientation until a later scene transition.
++	if G.ROOM and G.ROOM.T and G.ROOM.VT then
++		G.ROOM.VT.x, G.ROOM.VT.y = G.ROOM.T.x, G.ROOM.T.y
++		G.ROOM.VT.w, G.ROOM.VT.h = G.ROOM.T.w, G.ROOM.T.h
++	end
++	if G.ROOM_ATTACH and G.ROOM_ATTACH.T and G.ROOM_ATTACH.VT then
++		G.ROOM_ATTACH.VT.x, G.ROOM_ATTACH.VT.y = G.ROOM_ATTACH.T.x, G.ROOM_ATTACH.T.y
++		G.ROOM_ATTACH.VT.w, G.ROOM_ATTACH.VT.h = G.ROOM_ATTACH.T.w, G.ROOM_ATTACH.T.h; if portrait_refresh_backdrop then portrait_refresh_backdrop() end
++	end
++
  	G.WINDOWTRANS = {
  		x = 0, y = 0,
 -		w = G.TILE_W+2*G.ROOM_PADDING_W, 
 -		h = G.TILE_H+3*G.ROOM_PADDING_H,
 +		w = G.TILE_W+2*G.ROOM_PADDING_W,
 +		h = G.TILE_H+2*G.ROOM_PADDING_H,
- 		real_window_w = w,
- 		real_window_h = h
+-		real_window_w = w,
+-		real_window_h = h
++		real_window_w = physical_w,
++		real_window_h = physical_h
  	}
  
  	G.CANV_SCALE = 1
@@ -1109,4 +1234,15 @@
 +			}
 +		end
 +	end
++end
++
++function love.resize(w, h)
++	if love.system.getOS() == 'Android' and G and G.ROOM then
++		local pending = G.PORTRAIT_RESIZE_PENDING
++		if not pending or pending.w ~= w or pending.h ~= h then
++			G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}
++		end
++		return
++	end
++	_portrait_apply_resize(w, h)
 +end
