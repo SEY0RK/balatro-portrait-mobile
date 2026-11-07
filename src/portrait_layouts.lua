@@ -1256,7 +1256,6 @@ local function portrait_abort_android_layout_transition(pending, stage, err)
   end
   if G and G.SETTINGS then
     G.SETTINGS.portrait_display_mode = pending.previous_mode
-    G.SETTINGS.paused = false
     if G.save_settings then pcall(function() G:save_settings() end) end
   end
   local metrics = PORTRAIT_SWITCH_METRICS
@@ -1265,9 +1264,12 @@ local function portrait_abort_android_layout_transition(pending, stage, err)
     metrics.failed_stage = stage
     metrics.failed_reason = tostring(err or 'unknown error')
   end
-  -- Restore the prior Android orientation while the existing wipe still
-  -- covers the scene; then release the same vanilla wipe normally.
-  pcall(portrait_request_android_orientation, pending.previous_mode)
+  -- Restore the prior Android orientation only if the new request had
+  -- started; a scheduling failure must not recreate the window needlessly.
+  if pending.orientation_request_started_at then
+    pcall(portrait_request_android_orientation, pending.previous_mode)
+  end
+  if G and G.SETTINGS then G.SETTINGS.paused = false end
   if G and G.screenwipe and G.FUNCS and G.FUNCS.wipe_off then
     pcall(G.FUNCS.wipe_off)
   end
@@ -1372,6 +1374,7 @@ local function portrait_restart_scene_under_existing_wipe(pending)
         end
       }))
     elseif G.STAGE == G.STAGES.MAIN_MENU then
+      if metrics then metrics.active = false end
       G.E_MANAGER:add_event(Event({
         no_delete = true,
         func = function()
