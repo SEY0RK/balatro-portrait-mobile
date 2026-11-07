@@ -1147,10 +1147,11 @@ function portrait_fold6_is_inner_display(w, h)
   return math.min(w, h) >= 600
 end
 
---Request one of the two sensor-locked orientations from SDL. Toggling the
---resizable flag deliberately invokes SDL's Android SetWindowResizable hook,
---which forwards the requested aspect ratio to SDLActivity.setOrientationBis.
---Our Android smali patch maps that ratio to SENSOR_PORTRAIT / SENSOR_LANDSCAPE.
+--Request one sensor-locked orientation from SDL.
+--The Fold6 SDLActivity patch selects the requested orientation from width/height
+--and does not depend on the resizable flag. One setMode call is sufficient:
+--LÖVE 11.5 recreates its SDL window and GL context on every setMode call, so
+--the former false->true resizable toggle recreated the native window twice.
 function portrait_request_android_orientation(mode)
   if not (love and love.system and love.system.getOS and love.system.getOS() == 'Android') then
     return true
@@ -1166,17 +1167,16 @@ function portrait_request_android_orientation(mode)
   flags.fullscreen = true
   flags.fullscreentype = 'desktop'
   flags.usedpiscale = true
-  flags.resizable = false
+  flags.resizable = true
 
+  local started_at = love.timer.getTime()
   local ok, result = pcall(love.window.setMode, width, height, flags)
+  if PORTRAIT_SWITCH_METRICS and PORTRAIT_SWITCH_METRICS.active then
+    PORTRAIT_SWITCH_METRICS.orientation_request_ms = (love.timer.getTime() - started_at) * 1000
+    PORTRAIT_SWITCH_METRICS.orientation_finished_at = love.timer.getTime()
+  end
   if not ok or result == false then
     return false, tostring(result or 'Unable to set the Android window mode')
-  end
-
-  flags.resizable = true
-  ok, result = pcall(love.window.setMode, width, height, flags)
-  if not ok or result == false then
-    return false, tostring(result or 'Unable to enable Android orientation switching')
   end
   return true
 end
@@ -1191,6 +1191,7 @@ function portrait_capture_run_for_layout_reload()
     return nil, 'The current scene is not an active run'
   end
 
+  local capture_started_at = love.timer.getTime()
   G.ARGS = G.ARGS or {}
   local previous_save = G.ARGS.save_run
   local previous_culled = G.culled_table
@@ -1215,9 +1216,16 @@ function portrait_capture_run_for_layout_reload()
     return saved
   end)
 
+  if PORTRAIT_SWITCH_METRICS and PORTRAIT_SWITCH_METRICS.active then
+    PORTRAIT_SWITCH_METRICS.snapshot_ms = (love.timer.getTime() - capture_started_at) * 1000
+  end
   if not ok or not snapshot then
     G.ARGS.save_run = previous_save
     G.culled_table = previous_culled
+    if PORTRAIT_SWITCH_METRICS then
+      PORTRAIT_SWITCH_METRICS.active = false
+      PORTRAIT_SWITCH_METRICS.failed_stage = 'snapshot'
+    end
     return nil, tostring(snapshot or 'Unable to capture the active run')
   end
 
@@ -1242,10 +1250,24 @@ function portrait_restart_scene_for_layout_change(snapshot)
     local err
     if not snapshot then snapshot, err = portrait_capture_run_for_layout_reload() end
     if not snapshot then return false, err end
-    G.FUNCS.start_run(nil, {
+    -- A layout reload is not a normal game start. Bypass only the decorative
+    -- wipe animation (whose REAL-time timeline lasts 1.2s), but keep the
+    -- game's native delete_run -> start_run event sequence and save snapshot.
+    local old_wipe_on, old_wipe_off = G.FUNCS.wipe_on, G.FUNCS.wipe_off
+    G.FUNCS.wipe_on = function() end
+    G.FUNCS.wipe_off = function() end
+    local metrics = PORTRAIT_SWITCH_METRICS
+    local queued_at = love.timer.getTime()
+    local ok, err = pcall(G.FUNCS.start_run, nil, {
       savetext = snapshot,
       from_portrait_layout = true
     })
+    G.FUNCS.wipe_on, G.FUNCS.wipe_off = old_wipe_on, old_wipe_off
+    if metrics and metrics.active then
+      metrics.restart_enqueue_ms = (love.timer.getTime() - queued_at) * 1000
+      metrics.start_run_queued_at = love.timer.getTime()
+    end
+    if not ok then return false, tostring(err) end
     return true
   end
 
@@ -1419,10 +1441,31 @@ local function portrait_ensure_real_window_dimensions()
   end
 end
 
+local portrait_game_start_run = Game.start_run
+function Game:start_run(args)
+  local metrics = PORTRAIT_SWITCH_METRICS
+  local is_layout_reload = args and args.from_portrait_layout and metrics and metrics.active
+  local started_at = is_layout_reload and love.timer.getTime() or nil
+  portrait_game_start_run(self, args)
+  if is_layout_reload then
+    metrics.game_start_run_ms = (love.timer.getTime() - started_at) * 1000
+    metrics.game_start_run_finished_at = love.timer.getTime()
+    metrics.awaiting_first_frame = true
+  end
+end
+
 local portrait_game_update = Game.update
 function Game:update(dt)
   portrait_ensure_real_window_dimensions()
   portrait_game_update(self, dt)
+  local switch_metrics = PORTRAIT_SWITCH_METRICS
+  if switch_metrics and switch_metrics.awaiting_first_frame
+     and G.STAGE == G.STAGES.RUN and G.HUD and G.HUD_blind then
+    switch_metrics.first_frame_total_ms = (love.timer.getTime() - switch_metrics.started_at) * 1000
+    switch_metrics.completed_at = love.timer.getTime()
+    switch_metrics.awaiting_first_frame = nil
+    switch_metrics.active = false
+  end
   -- A cover orientation change is asynchronous. Wait until Android has
   -- delivered the target aspect ratio and the resize debounce has completed,
   -- then rebuild the scene from the snapshot captured before requesting it.
@@ -1445,6 +1488,9 @@ function Game:update(dt)
     local scene_ready = G.STAGE == G.STAGES.RUN or G.STAGE == G.STAGES.MAIN_MENU
     if pending_layout.stable_frames >= 2 and scene_ready then
       G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+      if switch_metrics and switch_metrics.active then
+        switch_metrics.surface_wait_ms = (love.timer.getTime() - (switch_metrics.orientation_finished_at or pending_layout.started_at)) * 1000
+      end
       local ok, err = portrait_restart_scene_for_layout_change(pending_layout.snapshot)
       if not ok then
         G.SETTINGS.portrait_display_mode = pending_layout.previous_mode
