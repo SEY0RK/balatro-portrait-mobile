@@ -1079,8 +1079,12 @@ def _patch_sdl_portrait_orientation(apk_out):
         super_match = re.search(r"(?m)^\.super\s+[^\n]+$", smali)
         if not super_match:
             raise RuntimeError(f".super declaration not found in {smali_path}")
-        insert_at = super_match.end()
-        smali = smali[:insert_at] + "\n" + field_decl + smali[insert_at:]
+        class_end = smali.rfind(".end class")
+        if class_end == -1:
+            raise RuntimeError(f"Could not find .end class in {smali_path}")
+        declaration = re.search(r"(?m)^\.(?:field|method)\b", smali)
+        insert_at = declaration.start() if declaration else class_end
+        smali = smali[:insert_at] + field_decl + "\n" + smali[insert_at:]
 
     # SDL calls this from native window creation and when the window's
     # resizable flag changes. Its p1/p2 arguments are the requested w/h ratio.
@@ -1171,8 +1175,14 @@ def _patch_sdl_portrait_orientation(apk_out):
             raise RuntimeError(f"Could not find .end class in {smali_path}")
         smali = smali[:class_end] + helper_method + smali[class_end:]
 
-    on_config_signature = ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V"
-    on_config_start = smali.find(on_config_signature)
+    on_config_match = re.search(
+        r"(?m)^\.method\s+\w+\s+onConfigurationChanged\(Landroid/content/res/Configuration;\)V\s*$",
+        smali,
+    )
+    on_config_signature = on_config_match.group(0) if on_config_match else (
+        ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V"
+    )
+    on_config_start = on_config_match.start() if on_config_match else -1
     if on_config_start == -1:
         on_config_method = (
             "\n"
