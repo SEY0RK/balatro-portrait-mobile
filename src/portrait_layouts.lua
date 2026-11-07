@@ -1245,6 +1245,161 @@ function portrait_capture_run_for_layout_reload()
   return snapshot
 end
 
+-- Cover-display switches start the vanilla wipe before asking SDL to
+-- recreate its Android window. This gives the card-flip wipe time to render
+-- before setMode's synchronous SDL/EGL work temporarily pauses the main loop.
+local PORTRAIT_WIPE_LEAD_SECONDS = 1.05
+
+local function portrait_abort_android_layout_transition(pending, stage, err)
+  if G and G.PORTRAIT_LAYOUT_RELOAD_PENDING == pending then
+    G.PORTRAIT_LAYOUT_RELOAD_PENDING = nil
+  end
+  if G and G.SETTINGS then
+    G.SETTINGS.portrait_display_mode = pending.previous_mode
+    G.SETTINGS.paused = false
+    if G.save_settings then pcall(function() G:save_settings() end) end
+  end
+  local metrics = PORTRAIT_SWITCH_METRICS
+  if metrics then
+    metrics.active = false
+    metrics.failed_stage = stage
+    metrics.failed_reason = tostring(err or 'unknown error')
+  end
+  -- Restore the prior Android orientation while the existing wipe still
+  -- covers the scene; then release the same vanilla wipe normally.
+  pcall(portrait_request_android_orientation, pending.previous_mode)
+  if G and G.screenwipe and G.FUNCS and G.FUNCS.wipe_off then
+    pcall(G.FUNCS.wipe_off)
+  end
+  print('ANDROID LAYOUT TRANSITION ABORTED (' .. tostring(stage) .. '): ' .. tostring(err))
+end
+
+function portrait_begin_android_layout_transition(snapshot, mode, previous_mode)
+  if not (G and G.E_MANAGER and G.FUNCS and G.FUNCS.wipe_on and G.FUNCS.wipe_off) then
+    return false, 'The game transition manager is unavailable'
+  end
+
+  local pending = {
+    mode = mode,
+    previous_mode = previous_mode,
+    snapshot = snapshot,
+    started_at = love.timer.getTime(),
+    stable_frames = 0,
+    wipe_started = false,
+    orientation_requested = false,
+    prestarted_wipe = true
+  }
+
+  -- Match vanilla start_run ordering: discard stale gameplay events, lock
+  -- input, then create the original screen-wipe before doing window work.
+  G.SETTINGS.paused = true
+  G.E_MANAGER:clear_queue()
+  local wipe_ok, wipe_err = pcall(G.FUNCS.wipe_on)
+  if not wipe_ok then
+    G.SETTINGS.paused = false
+    return false, tostring(wipe_err)
+  end
+
+  pending.wipe_started = true
+  pending.wipe_started_at = love.timer.getTime()
+  G.PORTRAIT_LAYOUT_RELOAD_PENDING = pending
+  local metrics = PORTRAIT_SWITCH_METRICS
+  if metrics and metrics.active then
+    metrics.wipe_started_at = pending.wipe_started_at
+  end
+
+  local queued, queue_err = pcall(function()
+    G.E_MANAGER:add_event(Event({
+      trigger = 'after',
+      delay = PORTRAIT_WIPE_LEAD_SECONDS,
+      no_delete = true,
+      blockable = false,
+      blocking = false,
+      func = function()
+        if G.PORTRAIT_LAYOUT_RELOAD_PENDING ~= pending then return true end
+        local request_started_at = love.timer.getTime()
+        pending.orientation_request_started_at = request_started_at
+        if metrics and metrics.active then
+          metrics.wipe_lead_ms = (request_started_at - pending.wipe_started_at) * 1000
+        end
+        local ok, err = portrait_request_android_orientation(mode)
+        if not ok then
+          portrait_abort_android_layout_transition(pending, 'orientation_request', err)
+          return true
+        end
+        pending.orientation_requested = true
+        pending.orientation_requested_at = love.timer.getTime()
+        return true
+      end
+    }))
+  end)
+  if not queued then
+    portrait_abort_android_layout_transition(pending, 'orientation_schedule', queue_err)
+    return false, tostring(queue_err)
+  end
+  return true
+end
+
+-- Equivalent to vanilla G.FUNCS.start_run, except wipe_on has already been
+-- started before the Android orientation request. Keep the same event order,
+-- native Game:start_run(save) restoration, and vanilla wipe_off animation.
+local function portrait_restart_scene_under_existing_wipe(pending)
+  local metrics = PORTRAIT_SWITCH_METRICS
+  local queued_at = love.timer.getTime()
+  local ok, err = pcall(function()
+    if G.STAGE == G.STAGES.RUN then
+      local args = {
+        savetext = pending.snapshot,
+        from_portrait_layout = true
+      }
+      if metrics and metrics.active then
+        metrics.pre_transition_ms = (queued_at - metrics.started_at) * 1000
+        metrics.start_run_queued_at = queued_at
+      end
+      G.E_MANAGER:add_event(Event({
+        no_delete = true,
+        func = function()
+          G:delete_run()
+          return true
+        end
+      }))
+      G.E_MANAGER:add_event(Event({
+        trigger = 'immediate',
+        no_delete = true,
+        func = function()
+          G:start_run(args)
+          return true
+        end
+      }))
+    elseif G.STAGE == G.STAGES.MAIN_MENU then
+      G.E_MANAGER:add_event(Event({
+        no_delete = true,
+        func = function()
+          G:delete_run()
+          return true
+        end
+      }))
+      G.E_MANAGER:add_event(Event({
+        no_delete = true,
+        blockable = true,
+        blocking = false,
+        func = function()
+          G:main_menu('game')
+          return true
+        end
+      }))
+    else
+      error('This screen cannot be safely rebuilt from an active run save')
+    end
+    G.FUNCS.wipe_off()
+  end)
+  if metrics and metrics.active then
+    metrics.restart_enqueue_ms = (love.timer.getTime() - queued_at) * 1000
+  end
+  if not ok then return false, tostring(err) end
+  return true
+end
+
 --Re-enter the active run through Balatro's native load-from-save path. That
 --path calls delete_run(), prep_stage(), creates new card areas/HUD/backdrop,
 --then restores every saved CardArea, tag, blind and game state. The settings
