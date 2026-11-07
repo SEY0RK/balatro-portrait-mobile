@@ -1178,7 +1178,7 @@
 +	end
 +	if G.ROOM_ATTACH and G.ROOM_ATTACH.T and G.ROOM_ATTACH.VT then
 +		G.ROOM_ATTACH.VT.x, G.ROOM_ATTACH.VT.y = G.ROOM_ATTACH.T.x, G.ROOM_ATTACH.T.y
-+		G.ROOM_ATTACH.VT.w, G.ROOM_ATTACH.VT.h = G.ROOM_ATTACH.T.w, G.ROOM_ATTACH.T.h
++		G.ROOM_ATTACH.VT.w, G.ROOM_ATTACH.VT.h = G.ROOM_ATTACH.T.w, G.ROOM_ATTACH.T.h; if portrait_refresh_backdrop then portrait_refresh_backdrop() end
 +	end
 +
  	G.WINDOWTRANS = {
