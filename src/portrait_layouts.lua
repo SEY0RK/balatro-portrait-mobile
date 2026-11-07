@@ -940,7 +940,6 @@ function portrait_rebuild_HUD()
   }
   if is_portrait then
     G.HUD.T.y = 0.2
-    G.HUD.T.x = (G.ROOM.T.w - G.HUD.T.w) / 2
   end
 
   local row_blind = G.HUD:get_UIE_by_ID('row_blind')
@@ -974,6 +973,7 @@ function portrait_rebuild_HUD()
   }
   G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
   G.HUD:recalculate()
+  if is_portrait then portrait_center_run_hud() end
   G.HUD_blind:recalculate()
 
   if had_hand_preview and is_portrait and PORTRAIT_CONFIG.hand_preview and PORTRAIT_CONFIG.hand_preview.enabled then
