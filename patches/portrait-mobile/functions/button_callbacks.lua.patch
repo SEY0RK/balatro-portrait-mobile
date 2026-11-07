@@ -283,6 +283,17 @@
 +  local previous_value = G.SETTINGS[setting_key]
 +  if previous_value == new_value then return end
 +
++  local track_display_switch = setting_key == 'portrait_display_mode'
++      and love.system.getOS() == 'Android'
++      and not portrait_fold6_is_inner_display()
++  if track_display_switch then
++    PORTRAIT_SWITCH_METRICS = {
++      active = true,
++      started_at = love.timer.getTime(),
++      target_mode = new_value
++    }
++  end
++
 +  -- Snapshot before asking Android to rotate. The window transition is
 +  -- asynchronous, so the scene is only rebuilt after the target aspect ratio
 +  -- has settled; the in-memory run must already be safe before that begins.
@@ -309,6 +320,10 @@
 +     and not portrait_fold6_is_inner_display() then
 +    local ok, err = portrait_request_android_orientation(new_value)
 +    if not ok then
++      if PORTRAIT_SWITCH_METRICS then
++        PORTRAIT_SWITCH_METRICS.active = false
++        PORTRAIT_SWITCH_METRICS.failed_stage = 'orientation_request'
++      end
 +      G.SETTINGS[setting_key] = previous_value
 +      G:save_settings()
 +      pcall(portrait_request_android_orientation, previous_value)
