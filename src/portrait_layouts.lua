@@ -1250,19 +1250,14 @@ function portrait_restart_scene_for_layout_change(snapshot)
     local err
     if not snapshot then snapshot, err = portrait_capture_run_for_layout_reload() end
     if not snapshot then return false, err end
-    -- A layout reload is not a normal game start. Bypass only the decorative
-    -- wipe animation (whose REAL-time timeline lasts 1.2s), but keep the
-    -- game's native delete_run -> start_run event sequence and save snapshot.
-    local old_wipe_on, old_wipe_off = G.FUNCS.wipe_on, G.FUNCS.wipe_off
-    G.FUNCS.wipe_on = function() end
-    G.FUNCS.wipe_off = function() end
+    -- Keep the original game transition animation. Optimize only the
+    -- pre-transition work (snapshot + Android surface/orientation wait).
     local metrics = PORTRAIT_SWITCH_METRICS
     local queued_at = love.timer.getTime()
     local ok, err = pcall(G.FUNCS.start_run, nil, {
       savetext = snapshot,
       from_portrait_layout = true
     })
-    G.FUNCS.wipe_on, G.FUNCS.wipe_off = old_wipe_on, old_wipe_off
     if metrics and metrics.active then
       metrics.restart_enqueue_ms = (love.timer.getTime() - queued_at) * 1000
       metrics.start_run_queued_at = love.timer.getTime()
