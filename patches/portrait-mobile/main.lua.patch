@@ -1,6 +1,6 @@
 --- a/main.lua
 +++ b/main.lua
-@@ -1,9 +1,57 @@
+@@ -1,9 +1,61 @@
 -if (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
 +if (love.system.getOS() == 'OS X' ) and (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
  
@@ -658,7 +658,7 @@
  		G.CONTROLLER:queue_L_cursor_press(x, y)
  	end
  	if button == 2 then
-@@ -277,47 +534,150 @@
+@@ -277,47 +534,151 @@
  end
  
  
@@ -719,6 +719,7 @@
 +function love.mousereleased(x, y, button, touch)
 +    if _ignore_phantom_mouse(touch) then return end
 +    if not (G and G.CONTROLLER) then return end
++    x, y = _transform_rotated_input(x, y)
 +    if touch and G.CONTROLLER.touch_position then
 +        G.CONTROLLER.touch_position.x = x
 +        G.CONTROLLER.touch_position.y = y
