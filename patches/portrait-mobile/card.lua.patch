@@ -1,7 +1,6 @@
 --- a/card.lua
 +++ b/card.lua
 @@ -764,19 +764,18 @@
-
          elseif self.ability.name == 'Ceremonial Dagger' then loc_vars = {self.ability.mult}
          elseif self.ability.name == 'Banner' then loc_vars = {self.ability.extra}
          elseif self.ability.name == 'Misprint' then
@@ -25,7 +24,6 @@
          elseif self.ability.name == 'Mystic Summit' then loc_vars = {self.ability.extra.mult, self.ability.extra.d_remaining}
          elseif self.ability.name == 'Marble Joker' then
 @@ -1522,7 +1521,6 @@
-
  end
  
  function Card:can_use_consumeable(any_state, skip_check)
@@ -34,7 +32,6 @@
          (G.CONTROLLER.locked) or
          (G.GAME.STOP_USE and G.GAME.STOP_USE > 0))
 @@ -2049,7 +2047,6 @@
-
              }))
              self:juice_up()
              G.VIBRATION = G.VIBRATION + 1
@@ -43,7 +40,6 @@
              childParts1:fade(0.3*explode_time) return true end)
      }))
 @@ -3468,7 +3465,7 @@
-
                      if self.ability.name == 'Vampire' and not context.blueprint then
                          local enhanced = {}
                          for k, v in ipairs(context.scoring_hand) do
@@ -53,7 +49,6 @@
                                  v.vampired = true
                                  v:set_ability(G.P_CENTERS.c_base, nil, true)
 @@ -4182,13 +4179,13 @@
-
          if self.ability.name == "Driver's License" then 
              self.ability.driver_tally = 0
              for k, v in pairs(G.playing_cards) do
@@ -70,7 +65,6 @@
          end
          if self.ability.name == "Cloud 9" then 
 @@ -4200,7 +4197,7 @@
-
          if self.ability.name == "Stone Joker" then 
              self.ability.stone_tally = 0
              for k, v in pairs(G.playing_cards) do
@@ -80,7 +74,6 @@
          end
          if self.ability.name == "Joker Stencil" then 
 @@ -4269,42 +4266,85 @@
-
  
  function Card:move(dt)
      Moveable.move(self, dt)
@@ -180,7 +173,6 @@
  function Card:hover()
      self:juice_up(0.05, 0.03)
 @@ -4333,13 +4373,8 @@
-
      Node.stop_hover(self)
  end
  
@@ -196,7 +188,6 @@
      scale = scale and scale*0.4 or 0.11
      Moveable.juice_up(self, scale, rot_amt)
 @@ -4390,6 +4425,23 @@
-
              self.tilt_var.my = ((0.5 + 0.5*self.ambient_tilt*math.sin(tilt_angle))*self.VT.h+self.VT.y+G.ROOM.T.y)*G.TILESIZE*G.TILESCALE
              self.tilt_var.amt = self.ambient_tilt*(0.5+math.cos(tilt_angle))*tilt_factor
          end
@@ -221,7 +212,6 @@
          if self.children.particles then self.children.particles:draw() end
  
 @@ -4406,7 +4458,12 @@
-
                  self.children.buy_button.states.visible = false
              end
          end
@@ -236,7 +226,6 @@
          if self.vortex then
              if self.facing == 'back' then 
 @@ -4447,7 +4504,7 @@
-
              if self.ability.name == 'Invisible Joker' and (self.config.center.discovered or self.bypass_discovery_center) then
                  self.children.center:draw_shader('voucher', nil, self.ARGS.send_to_shader)
              end
@@ -246,7 +235,6 @@
              if self.edition or self.seal or self.ability.eternal or self.ability.rental or self.ability.perishable or self.sticker or ((self.sticker_run and self.sticker_run ~= 'NONE') and G.SETTINGS.run_stake_stickers) or (self.ability.set == 'Spectral') or self.debuff or self.greyed or (self.ability.name == 'The Soul') or (self.ability.set == 'Voucher') or (self.ability.set == 'Booster') or self.config.center.soul_pos or self.config.center.demo then
                  
 @@ -4572,10 +4629,18 @@
-
              if k ~= 'focused_ui' and k ~= "front" and k ~= "back" and k ~= "soul_parts" and k ~= "center" and k ~= 'floating_sprite' and k~= "shadow" and k~= "use_button" and k ~= 'buy_button' and k ~= 'buy_and_use_button' and k~= "debuff" and k ~= 'price' and k~= 'particles' and k ~= 'h_popup' then v:draw() end
          end
  
@@ -267,7 +255,6 @@
          self:draw_boundingrect()
      end
 @@ -4592,13 +4657,40 @@
-
      if self.ability.consumeable or self.ability.set == 'Joker' or (self.area and self.area == G.pack_cards) then
          if self.highlighted and self.area and self.area.config.type ~= 'shop' then
              local x_off = (self.ability.consumeable and -0.1 or 0)
