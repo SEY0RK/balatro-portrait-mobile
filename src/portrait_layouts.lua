@@ -1369,6 +1369,23 @@ local function portrait_ensure_real_window_dimensions()
   if not G.WINDOWTRANS.real_window_h or G.WINDOWTRANS.real_window_h <= 0 then
     G.WINDOWTRANS.real_window_h = height
   end
+
+  -- The first Android resize may have fired before G.ROOM existed and was
+  -- discarded by _portrait_apply_resize. update_canvas_juice runs before
+  -- love.draw can consume a deferred resize, so seed the original room
+  -- transform here and ask the draw path to apply the real viewport next.
+  if G.ROOM and G.ROOM.T and not G.ROOM_ORIG then
+    G.ROOM_ORIG = {
+      x = G.ROOM.T.x or 0,
+      y = G.ROOM.T.y or 0,
+      r = G.ROOM.T.r or 0
+    }
+    if love.system.getOS() == 'Android' and not G.PORTRAIT_RESIZE_PENDING then
+      G.PORTRAIT_RESIZE_PENDING = {
+        w = width, h = height, stable_frames = 2
+      }
+    end
+  end
 end
 
 local portrait_game_update = Game.update
