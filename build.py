@@ -1084,7 +1084,7 @@ def _patch_sdl_portrait_orientation(apk_out):
         raise RuntimeError(f"{signature} has no .end method in {smali_path}")
 
     method_body = smali[method_start:method_end]
-    header_match = re.search(r"(?m)^\\s+\\.(?:locals|registers)\\s+\\d+\\s*$", method_body)
+    header_match = re.search(r"(?m)^\s+\.(?:locals|registers)\s+\d+\s*$", method_body)
     if not header_match:
         raise RuntimeError(f"{signature} has no .locals/.registers header in {smali_path}")
 
@@ -1093,22 +1093,22 @@ def _patch_sdl_portrait_orientation(apk_out):
     # orientation requested by the game's old portrait hint.
     insert_at = method_start + header_match.end()
     injected = (
-        "\\n"
-        f"    {marker}\\n"
-        "    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;\\n"
-        "    move-result-object p2\\n"
-        "    invoke-virtual {p2}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;\\n"
-        "    move-result-object p2\\n"
-        "    iget p2, p2, Landroid/content/res/Configuration;->smallestScreenWidthDp:I\\n"
-        "    const/16 p1, 0x258\\n"
-        "    if-lt p2, p1, :balatro_fold_cover\\n"
-        "    const/4 p1, 0x0\\n"
-        "    goto :balatro_fold_apply\\n"
-        "    :balatro_fold_cover\\n"
-        "    const/4 p1, 0x1\\n"
-        "    :balatro_fold_apply\\n"
-        "    invoke-virtual {p0, p1}, Landroid/app/Activity;->setRequestedOrientation(I)V\\n"
-        "    return-void\\n"
+        "\n"
+        f"    {marker}\n"
+        "    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;\n"
+        "    move-result-object p2\n"
+        "    invoke-virtual {p2}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;\n"
+        "    move-result-object p2\n"
+        "    iget p2, p2, Landroid/content/res/Configuration;->smallestScreenWidthDp:I\n"
+        "    const/16 p1, 0x258\n"
+        "    if-lt p2, p1, :balatro_fold_cover\n"
+        "    const/4 p1, 0x0\n"
+        "    goto :balatro_fold_apply\n"
+        "    :balatro_fold_cover\n"
+        "    const/4 p1, 0x1\n"
+        "    :balatro_fold_apply\n"
+        "    invoke-virtual {p0, p1}, Landroid/app/Activity;->setRequestedOrientation(I)V\n"
+        "    return-void\n"
     )
     smali = smali[:insert_at] + injected + smali[insert_at:]
 
@@ -1119,32 +1119,32 @@ def _patch_sdl_portrait_orientation(apk_out):
     # fixed orientations and do not follow the accelerometer.
     if ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V" not in smali:
         on_config = (
-            "\\n"
-            ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V\\n"
-            "    .locals 2\\n"
-            "    invoke-super {p0, p1}, Landroid/app/Activity;->onConfigurationChanged(Landroid/content/res/Configuration;)V\\n"
-            "    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;\\n"
-            "    move-result-object v0\\n"
-            "    invoke-virtual {v0}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;\\n"
-            "    move-result-object v0\\n"
-            "    iget v0, v0, Landroid/content/res/Configuration;->smallestScreenWidthDp:I\\n"
-            "    const/16 v1, 0x258\\n"
-            "    if-lt v0, v1, :balatro_config_cover\\n"
-            "    const/4 v1, 0x0\\n"
-            "    goto :balatro_config_apply\\n"
-            "    :balatro_config_cover\\n"
-            "    const/4 v1, 0x1\\n"
-            "    :balatro_config_apply\\n"
-            "    invoke-virtual {p0, v1}, Landroid/app/Activity;->setRequestedOrientation(I)V\\n"
-            "    return-void\\n"
-            ".end method\\n"
+            "\n"
+            ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V\n"
+            "    .locals 2\n"
+            "    invoke-super {p0, p1}, Landroid/app/Activity;->onConfigurationChanged(Landroid/content/res/Configuration;)V\n"
+            "    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;\n"
+            "    move-result-object v0\n"
+            "    invoke-virtual {v0}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;\n"
+            "    move-result-object v0\n"
+            "    iget v0, v0, Landroid/content/res/Configuration;->smallestScreenWidthDp:I\n"
+            "    const/16 v1, 0x258\n"
+            "    if-lt v0, v1, :balatro_config_cover\n"
+            "    const/4 v1, 0x0\n"
+            "    goto :balatro_config_apply\n"
+            "    :balatro_config_cover\n"
+            "    const/4 v1, 0x1\n"
+            "    :balatro_config_apply\n"
+            "    invoke-virtual {p0, v1}, Landroid/app/Activity;->setRequestedOrientation(I)V\n"
+            "    return-void\n"
+            ".end method\n"
         )
         class_end = smali.rfind(".end class")
         if class_end == -1:
             raise RuntimeError(f"Could not find .end class in {smali_path}")
         smali = smali[:class_end] + on_config + smali[class_end:]
 
-    with open(smali_path, "w", encoding="utf-8", newline="\\n") as f:
+    with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(smali)
 
 def build_apk(profiler=None):
