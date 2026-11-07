@@ -1446,6 +1446,9 @@ function Game:start_run(args)
   local metrics = PORTRAIT_SWITCH_METRICS
   local is_layout_reload = args and args.from_portrait_layout and metrics and metrics.active
   local started_at = is_layout_reload and love.timer.getTime() or nil
+  if is_layout_reload then
+    metrics.queue_to_start_run_ms = (started_at - (metrics.start_run_queued_at or started_at)) * 1000
+  end
   portrait_game_start_run(self, args)
   if is_layout_reload then
     metrics.game_start_run_ms = (love.timer.getTime() - started_at) * 1000
