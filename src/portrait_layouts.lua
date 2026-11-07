@@ -1094,6 +1094,46 @@ function portrait_arrange_tags()
   end
 end
 
+--Resize and realign the felt/background sprite when the logical room changes
+--between portrait and the original landscape viewport. Its dimensions are
+--fixed when start_run creates it, so changing only ROOM.T left old black bands
+--or a cropped background behind the new layout.
+function portrait_refresh_backdrop()
+  local bg = G and G.SPLASH_BACK
+  if not (bg and not bg.REMOVED and bg.T and G.ROOM and G.ROOM.T) then return end
+  bg.T.w = G.ROOM.T.w + 60
+  bg.T.h = G.ROOM.T.h + 22
+  if bg.VT then
+    bg.VT.w = bg.T.w
+    bg.VT.h = bg.T.h
+  end
+  if bg.align_to_major then bg:align_to_major() end
+  if bg.hard_set_VT then bg:hard_set_VT() end
+end
+
+--One live-layout transaction for both display-direction changes and the
+--Classic / One-Thumb / Focus selector. Rebuild the HUD first: One-Thumb's
+--score dock and Focus's blind panel are created by their HUD builders. Only
+--then place the card areas against the new HUD and rebuild the button bar.
+function portrait_apply_live_layout()
+  if not G then return end
+  if G.STAGE == G.STAGES.RUN then
+    portrait_rebuild_HUD()
+    if set_screen_positions then set_screen_positions() end
+    if G.F_PORTRAIT_LAYOUT then
+      portrait_reflow_panels()
+      portrait_arrange_tags()
+    end
+    if G.buttons and rebuild_buttons_uibox then rebuild_buttons_uibox() end
+  elseif G.STAGE == G.STAGES.MAIN_MENU then
+    if G.MAIN_MENU_UI then G.MAIN_MENU_UI:remove(); G.MAIN_MENU_UI = nil end
+    if G.PROFILE_BUTTON then G.PROFILE_BUTTON:remove(); G.PROFILE_BUTTON = nil end
+    if G.LANGUAGE_BUTTON then G.LANGUAGE_BUTTON:remove(); G.LANGUAGE_BUTTON = nil end
+    if set_main_menu_UI then set_main_menu_UI() end
+  end
+  portrait_refresh_backdrop()
+end
+
 --Sets the text of a row to config.text_scale once the box is built, for rows
 --whose label line has to stay exactly as vanilla wrote it (another mod's
 --Lovely patch anchors on that line).
