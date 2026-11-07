@@ -322,25 +322,18 @@
 +  if setting_key == 'portrait_display_mode'
 +     and love.system.getOS() == 'Android'
 +     and not portrait_fold6_is_inner_display() then
-+    local ok, err = portrait_request_android_orientation(new_value)
++    local ok, err = portrait_begin_android_layout_transition(snapshot, new_value, previous_value)
 +    if not ok then
 +      if PORTRAIT_SWITCH_METRICS then
 +        PORTRAIT_SWITCH_METRICS.active = false
-+        PORTRAIT_SWITCH_METRICS.failed_stage = 'orientation_request'
++        PORTRAIT_SWITCH_METRICS.failed_stage = 'wipe_start'
++        PORTRAIT_SWITCH_METRICS.failed_reason = tostring(err)
 +      end
 +      G.SETTINGS[setting_key] = previous_value
++      G.SETTINGS.paused = false
 +      G:save_settings()
-+      pcall(portrait_request_android_orientation, previous_value)
 +      print('ANDROID ORIENTATION CHANGE ABORTED: '..tostring(err))
-+      return
 +    end
-+    G.PORTRAIT_LAYOUT_RELOAD_PENDING = {
-+      mode = new_value,
-+      previous_mode = previous_value,
-+      snapshot = snapshot,
-+      started_at = love.timer.getTime(),
-+      stable_frames = 0
-+    }
 +    return
 +  end
 +
