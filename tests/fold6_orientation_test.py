@@ -52,13 +52,12 @@ def main():
     assert ".method public onConfigurationChanged(Landroid/content/res/Configuration;)V" in result
     assert result.count("balatroApplyFoldOrientation()V") == 2
 
-    existing_callback = BASE.replace(
-        """.method protected onConfigurationChanged(Landroid/content/res/Configuration;)V
+    existing_callback = BASE + """.method protected onConfigurationChanged(Landroid/content/res/Configuration;)V
     .locals 0
     invoke-super {p0, p1}, Landroid/app/Activity;->onConfigurationChanged(Landroid/content/res/Configuration;)V
     return-void
-.end method""",
-    )
+.end method
+"""
     existing_result = patch(existing_callback)
     assert existing_result.count(
         ".method protected onConfigurationChanged(Landroid/content/res/Configuration;)V"
