@@ -534,6 +534,30 @@
 +        if math.abs(expected_w - canvas_w) > 2 or math.abs(expected_h - canvas_h) > 2 then
 +            love.resize(screen_w, screen_h)
 +        end
++        local pending = G.PORTRAIT_RESIZE_PENDING
++        if pending then
++            if pending.w ~= screen_w or pending.h ~= screen_h then
++                pending.w, pending.h, pending.stable_frames = screen_w, screen_h, 0
++            else
++                pending.stable_frames = pending.stable_frames + 1
++            end
++            if pending.stable_frames >= 2 then
++                G.PORTRAIT_RESIZE_PENDING = nil
++                _portrait_apply_resize(screen_w, screen_h)
++            else
++                -- Keep the last complete framebuffer scaled to the new surface
++                -- while Android finishes its fold/unfold configuration change.
++                love.graphics.origin()
++                love.graphics.setScissor()
++                love.graphics.setShader()
++                love.graphics.clear(0, 0, 0, 1)
++                love.graphics.setColor(1, 1, 1, 1)
++                love.graphics.draw(G.CANVAS, 0, 0, 0,
++                    screen_w / G.CANVAS:getWidth(),
++                    screen_h / G.CANVAS:getHeight())
++                return
++            end
++        end
 +    end
 +	G:draw()
  end
@@ -646,7 +670,7 @@
  		G.CONTROLLER:queue_L_cursor_press(x, y)
  	end
  	if button == 2 then
-@@ -277,47 +534,151 @@
+@@ -277,47 +534,174 @@
  end
  
  
