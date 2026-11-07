@@ -1,8 +1,9 @@
 --- a/main.lua
 +++ b/main.lua
-@@ -1,8 +1,48 @@
+@@ -1,9 +1,49 @@
 -if (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
 +if (love.system.getOS() == 'OS X' ) and (jit.arch == 'arm64' or jit.arch == 'arm') then jit.off() end
+ 
  
 +local function _force_android_portrait_hints()
 +    -- System orientation is selected by SDLActivity from
@@ -976,7 +977,7 @@
  			end
  		end
  
-@@ -434,49 +857,212 @@
+@@ -434,51 +857,212 @@
  end
  
 -function love.resize(w, h)
@@ -984,7 +985,10 @@
 +	if not G or not G.ROOM then
 +		return
  	end
- 
+-	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
+-		h = w/1
+-	end
++ 
 -	--When the window is resized, this code resizes the Canvas, then places the 'room' or gamearea into the middle without streching it
 -	if w/h < G.window_prev.orig_ratio then
 -		G.TILESCALE = G.window_prev.orig_scale*w/G.window_prev.w
