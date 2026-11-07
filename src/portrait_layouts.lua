@@ -1049,11 +1049,11 @@ end
 function portrait_reflow_panels()
   if not G.F_PORTRAIT_LAYOUT or not G.hand then return end
   G.hand.T.y = portrait_hand_rest_y()
-  if G.shop and not G.shop.REMOVED and G.STATE == G.STATES.SHOP then
+  if G.shop and not G.shop.REMOVED and G.shop.alignment and G.shop.alignment.offset and G.STATE == G.STATES.SHOP then
     G.shop.alignment.offset.y = portrait_shop_offset()
     portrait_realign_box(G.shop)
   end
-  if G.blind_select and not G.blind_select.REMOVED and G.STATE == G.STATES.BLIND_SELECT then
+  if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.blind_select.alignment.offset and G.STATE == G.STATES.BLIND_SELECT then
     G.blind_select.alignment.offset.y = portrait_blind_select_offset()
     portrait_realign_box(G.blind_select)
   end
@@ -1070,7 +1070,7 @@ function portrait_restore_landscape_panels()
     G.shop.alignment.offset.y = -5.3
     portrait_realign_box(G.shop)
   end
-  if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.hand and G.jokers then
+  if G.blind_select and not G.blind_select.REMOVED and G.blind_select.alignment and G.blind_select.alignment.offset and G.blind_select.T and G.hand and G.jokers then
     G.blind_select.alignment.offset.y = 0.8 - (G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
     portrait_realign_box(G.blind_select)
   end
