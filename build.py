@@ -1204,7 +1204,7 @@ def build_apk(profiler=None):
         if re.search(r'android:appCategory="[^"]+"', m):
             m = re.sub(r'android:appCategory="[^"]+"', 'android:appCategory="game"', m)
         else:
-            m = re.sub(r'(<application\\b)', r'\\1 android:appCategory="game"', m, count=1)
+            m = re.sub(r'(<application\b)', r'\1 android:appCategory="game"', m, count=1)
         m = re.sub(r'android:configChanges="[^"]+"',
                    'android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|keyboard|keyboardHidden|navigation"', m)
         with open(manifest_path, "w") as f:
