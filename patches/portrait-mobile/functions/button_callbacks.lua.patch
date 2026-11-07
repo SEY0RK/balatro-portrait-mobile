@@ -263,7 +263,7 @@
    INIT_COLLECTION_CARD_ALERTS()
  end
  
-@@ -871,11 +857,149 @@
+@@ -871,11 +857,147 @@
  G.FUNCS.change_play_discard_position = function(args)
    G.SETTINGS.play_button_pos = args.to_key
    if G.buttons then
@@ -292,8 +292,6 @@
 +    -- be snapshotted. Restore the prior setting and keep the current scene.
 +    G.SETTINGS[setting_key] = previous_value
 +    G:save_settings()
-+    local w, h = love.graphics.getDimensions()
-+    love.resize(w, h)
 +    print('PORTRAIT LAYOUT RELOAD ABORTED: ' .. tostring(err))
 +    if attention_text then
 +      attention_text({
