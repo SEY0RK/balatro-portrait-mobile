@@ -263,7 +263,7 @@
    INIT_COLLECTION_CARD_ALERTS()
  end
  
-@@ -871,11 +857,123 @@
+@@ -871,11 +857,126 @@
  G.FUNCS.change_play_discard_position = function(args)
    G.SETTINGS.play_button_pos = args.to_key
    if G.buttons then
