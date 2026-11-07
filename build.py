@@ -1228,7 +1228,7 @@ def _patch_sdl_portrait_orientation(apk_out):
         raise RuntimeError("SDL surface wait timeout was not found or already patched")
     smali = smali[:command_start] + command_body + smali[command_end:]
 
-    with open(smali_path, "w", encoding="utf-8", newline="\\n") as f:
+    with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(smali)
 
 def build_apk(profiler=None):
