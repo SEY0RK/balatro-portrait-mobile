@@ -1826,8 +1826,8 @@
          love.graphics.setShader( G.SHADERS['CRT'])
          G.SETTINGS.GRAPHICS.crt = G.SETTINGS.GRAPHICS.crt/0.3
      end
--        love.graphics.scale(1/G.CANV_SCALE)
-+
+         love.graphics.scale(1/G.CANV_SCALE)
+ 
 +        if G.F_ROTATED_LANDSCAPE and not G.AA_CANVAS then
 +            love.graphics.translate(G.PORTRAIT_SCREEN_W or love.graphics.getWidth(), 0)
 +            love.graphics.rotate(math.pi/2)
