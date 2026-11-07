@@ -1500,7 +1500,7 @@
       
      self.HUD:recalculate()
 +    -- The shelves of the non-classic layouts start under the HUD just built.
-+    if G.F_PORTRAIT_LAYOUT then self.HUD:align_to_major(); self.HUD:hard_set_VT(); set_screen_positions() end
++    if G.F_PORTRAIT_LAYOUT then self.HUD.alignment.prev_offset.x = nil; self.HUD:align_to_major(); self.HUD:hard_set_VT(); set_screen_positions() end
  
      G.E_MANAGER:add_event(Event({
          trigger = 'immediate',
