@@ -312,8 +312,12 @@
 +    end
 +  end
 +
++  local settings_save_started_at = love.timer.getTime()
 +  G.SETTINGS[setting_key] = new_value
 +  G:save_settings()
++  if PORTRAIT_SWITCH_METRICS and PORTRAIT_SWITCH_METRICS.active then
++    PORTRAIT_SWITCH_METRICS.settings_save_ms = (love.timer.getTime() - settings_save_started_at) * 1000
++  end
 +
 +  if setting_key == 'portrait_display_mode'
 +     and love.system.getOS() == 'Android'
