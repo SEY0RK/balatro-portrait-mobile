@@ -1448,7 +1448,7 @@
      G.SPLASH_BACK:set_alignment({
          major = G.play,
          type = 'cm',
-@@ -2611,15 +2469,38 @@
+@@ -2611,15 +2469,39 @@
      self.deck:hard_set_cards()
      
      self.HUD = UIBox{
@@ -1458,7 +1458,8 @@
 +        config = {
 +            align = (G.F_PORTRAIT_LAYOUT and 'tm' or 'cli'), 
 +            offset = (G.F_PORTRAIT_LAYOUT and {x=0, y=0.2} or {x=-0.7, y=0}), 
-+            major = (G.F_PORTRAIT_LAYOUT and G.ROOM or G.ROOM_ATTACH)
++            -- ROOM is a Node; ROOM_ATTACH is the Moveable anchor UIBox requires.
++            major = G.ROOM_ATTACH
 +        }
      }
 +    
