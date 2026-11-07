@@ -567,7 +567,7 @@
 +            local waiting_for_requested_orientation = G.PORTRAIT_LAYOUT_RELOAD_PENDING
 +                and ((G.PORTRAIT_LAYOUT_RELOAD_PENDING.mode == 2 and screen_w <= screen_h)
 +                    or (G.PORTRAIT_LAYOUT_RELOAD_PENDING.mode ~= 2 and screen_h <= screen_w))
-+            if pending.stable_frames >= 2 and not waiting_for_requested_orientation then
++            if pending.stable_frames >= 2 and not waiting_for_requested_orientation and G.ROOM then
 +                G.PORTRAIT_RESIZE_PENDING = nil
 +                _portrait_apply_resize(screen_w, screen_h)
 +            else
@@ -982,9 +982,8 @@
  
 -function love.resize(w, h)
 +local function _portrait_apply_resize(w, h)
-+	if not G or not G.ROOM then
-+		return
-+	end
++	if not G then return end
++	if not G.ROOM then G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}; return end
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
 -		h = w/1
 -	end
