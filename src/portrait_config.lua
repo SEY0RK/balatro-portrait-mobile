@@ -484,8 +484,10 @@ function portrait_diagnostics_report()
     local switch_metrics = PORTRAIT_SWITCH_METRICS
     if switch_metrics then
         add("Switch snapshot ms", switch_metrics.snapshot_ms and fmt(switch_metrics.snapshot_ms) or "pending")
+        add("Switch settings save ms", switch_metrics.settings_save_ms and fmt(switch_metrics.settings_save_ms) or "pending")
         add("Switch orientation ms", switch_metrics.orientation_request_ms and fmt(switch_metrics.orientation_request_ms) or "pending")
         add("Switch surface wait ms", switch_metrics.surface_wait_ms and fmt(switch_metrics.surface_wait_ms) or "pending")
+        add("Switch pre-transition ms", switch_metrics.pre_transition_ms and fmt(switch_metrics.pre_transition_ms) or "pending")
         add("Switch queue wait ms", switch_metrics.queue_to_start_run_ms and fmt(switch_metrics.queue_to_start_run_ms) or "pending")
         add("Switch start_run ms", switch_metrics.game_start_run_ms and fmt(switch_metrics.game_start_run_ms) or "pending")
         add("Switch total ms", switch_metrics.first_frame_total_ms and fmt(switch_metrics.first_frame_total_ms) or "pending")
