@@ -524,6 +524,31 @@
  end
  
  function love.draw()
++    local os_name = love.system.getOS()
++    -- The first Android resize can arrive before ROOM exists and be deferred.
++    -- In that case there is no old canvas for the normal resize/draw path to
++    -- use as a placeholder. Wait for a stable surface and initialize it before
++    -- entering Game:draw(), which assumes G.CANVAS is already available.
++    if (os_name == 'Android' or os_name == 'iOS') and G and G.ROOM and not G.CANVAS then
++        local screen_w, screen_h = love.graphics.getDimensions()
++        local pending = G.PORTRAIT_RESIZE_PENDING
++        if not pending or pending.w ~= screen_w or pending.h ~= screen_h then
++            pending = {w = screen_w, h = screen_h, stable_frames = 0}
++            G.PORTRAIT_RESIZE_PENDING = pending
++        else
++            pending.stable_frames = (pending.stable_frames or 0) + 1
++        end
++        if pending.stable_frames >= 2 and screen_w > 0 and screen_h > 0 and G.window_prev then
++            G.PORTRAIT_RESIZE_PENDING = nil
++            _portrait_apply_resize(screen_w, screen_h)
++        end
++        if not G.CANVAS then
++            love.graphics.origin()
++            love.graphics.setScissor()
++            love.graphics.clear(0, 0, 0, 1)
++            return
++        end
++    end
 -
 -	if splashVideo and not shouldSplash then
 -		-- Center the video on the screen
