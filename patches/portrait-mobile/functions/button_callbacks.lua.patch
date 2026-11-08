@@ -126,12 +126,47 @@
 +-- never become the displayed target score. Preserve its sizing callback,
 +-- then explicitly restore chip_text from Blind.chips using number_format().
 +G.FUNCS.portrait_blind_chip_UI_scale = function(e)
-+  if G.FUNCS.blind_chip_UI_scale then
-+    G.FUNCS.blind_chip_UI_scale(e)
-+  end
 +  local blind = G.GAME and G.GAME.blind
-+  if not blind or type(blind.chips) ~= 'number' then return end
-+  blind.chip_text = number_format(blind.chips)
++  local cfg = e and e.config or {}
++  local ref = cfg.ref_table
++  local function diag_value(v)
++    if v == nil then return '<nil>' end
++    if type(v) == 'table' then return '<table>' end
++    return tostring(v)
++  end
++  local before_chips = blind and blind.chips
++  local before_text = blind and blind.chip_text
++  local before_ref = ref and cfg.ref_value and ref[cfg.ref_value]
++  local vanilla = G.FUNCS.blind_chip_UI_scale
++  print('[BLIND_DIAG] callback_enter blind=' .. diag_value(blind)
++    .. ' chips=' .. diag_value(before_chips)
++    .. ' chip_text=' .. diag_value(before_text)
++    .. ' ref_is_blind=' .. tostring(ref == blind)
++    .. ' ref_value=' .. diag_value(cfg.ref_value)
++    .. ' ref_value_before=' .. diag_value(before_ref)
++    .. ' scale=' .. diag_value(cfg.scale)
++    .. ' text=' .. diag_value(cfg.text)
++    .. ' vanilla_callback=' .. tostring(type(vanilla)))
++  if vanilla then vanilla(e) end
++  local after_vanilla_text = blind and blind.chip_text
++  local after_vanilla_ref = ref and cfg.ref_value and ref[cfg.ref_value]
++  print('[BLIND_DIAG] callback_after_vanilla chips=' .. diag_value(blind and blind.chips)
++    .. ' chip_text=' .. diag_value(after_vanilla_text)
++    .. ' ref_value=' .. diag_value(after_vanilla_ref)
++    .. ' scale=' .. diag_value(cfg.scale)
++    .. ' text=' .. diag_value(cfg.text))
++  if not blind or type(blind.chips) ~= 'number' then
++    print('[BLIND_DIAG] callback_exit invalid_blind_or_chips')
++    return
++  end
++  local formatted = number_format(blind.chips)
++  blind.chip_text = formatted
++  local final_ref = ref and cfg.ref_value and ref[cfg.ref_value]
++  print('[BLIND_DIAG] callback_exit chips=' .. diag_value(blind.chips)
++    .. ' formatted=' .. diag_value(formatted)
++    .. ' chip_text=' .. diag_value(blind.chip_text)
++    .. ' ref_value=' .. diag_value(final_ref)
++    .. ' ref_is_blind=' .. tostring(ref == blind))
 +end
 +
  --Adds the prefix for the debuff text for the wheel blind
