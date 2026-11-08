@@ -783,7 +783,7 @@
 +            {n=G.UIT.R, config={align = "cm", minh = chip_row_h}, nodes={
                {n=G.UIT.O, config={w=0.5,h=0.5, colour = G.C.BLUE, object = stake_sprite, hover = true, can_collide = false}},
                {n=G.UIT.B, config={h=0.1,w=0.1}},
--              {n=G.UIT.T, config={ref_table = G.GAME.blind, ref_value = 'chip_text', scale = 0.001, colour = G.C.RED, lang = G.LANGUAGES['en-us'], shadow = true, id = 'HUD_blind_count', func = 'blind_chip_UI_scale'}}
+-              {n=G.UIT.T, config={ref_table = G.GAME.blind, ref_value = 'chip_text', scale = 0.001, colour = G.C.RED, lang = G.LANGUAGES['en-us'], shadow = true, id = 'HUD_blind_count', func = 'portrait_blind_chip_UI_scale'}}
 +              {n=G.UIT.T, config={ref_table = G.GAME.blind, ref_value = 'chip_text', scale = 0.001, colour = G.C.RED, shadow = true, id = 'HUD_blind_count', func = 'blind_chip_UI_scale'}}
              }},
 -            {n=G.UIT.R, config={align = "cm", minh = 0.45, maxw = 2.8, func = 'HUD_blind_reward'}, nodes={
