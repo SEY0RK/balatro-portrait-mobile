@@ -26,6 +26,12 @@ if resize_start < 0:
 resize_body = mobile[resize_start:]
 require_before(
     resize_body,
+    "+\tif G then G.CANV_SCALE = G.CANV_SCALE or 1 end",
+    "+\tif G and G.WINDOWTRANS then",
+    "mobile resize must initialize CANV_SCALE before returning to Steamodded",
+)
+require_before(
+    resize_body,
     "+\t\tG.WINDOWTRANS.real_window_w = w",
     "+\tif love.system.getOS() == 'Android' and G and G.ROOM then",
     "Steamodded wrapper must see current dimensions before Android resize deferral",
@@ -36,6 +42,12 @@ resize_start = desktop.find(" function love.resize(w, h)")
 if resize_start < 0:
     raise SystemExit("FAIL: desktop love.resize function not found")
 resize_body = desktop[resize_start:]
+require_before(
+    resize_body,
+    "+\tif G then G.CANV_SCALE = G.CANV_SCALE or 1 end",
+    "+\tif G and G.WINDOWTRANS then",
+    "desktop resize must initialize CANV_SCALE before returning to Steamodded",
+)
 require_before(
     resize_body,
     "+\t\tG.WINDOWTRANS.real_window_w = w",
