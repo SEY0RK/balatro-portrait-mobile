@@ -120,8 +120,8 @@
 +-- function value held in G.FUNCS.portrait_HUD_blind_debuff — which still
 +-- points to the vanilla portrait behavior above.
 +G.FUNCS.portrait_HUD_blind_debuff = G.FUNCS.HUD_blind_debuff
-
--- Keep the blind target label bound to the real chip requirement.
++
++-- Keep the blind target label bound to the real chip requirement.
 -- Steamodded's scale_number() returns a logarithmic sizing value; it must
 -- never become the displayed target score. Preserve its sizing callback,
 -- then explicitly restore chip_text from Blind.chips using number_format().
