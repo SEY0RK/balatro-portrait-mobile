@@ -774,6 +774,12 @@
  end
  
  function love.resize(w, h)
++	-- Steamodded's love.resize wrapper allocates a stencil canvas after this
++	-- callback, so publish physical dimensions even before G.ROOM exists.
++	if G and G.WINDOWTRANS then
++		G.WINDOWTRANS.real_window_w = w
++		G.WINDOWTRANS.real_window_h = h
++	end
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
 -		h = w/1
 +	if not G or not G.ROOM then
