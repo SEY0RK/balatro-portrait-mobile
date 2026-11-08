@@ -111,6 +111,10 @@ PATCH_URL      = "https://github.com/blake502/balatro-apk-maker/releases/downloa
 # be hash-pinned here. All version-pinned downloads above are SHA-256 verified.
 LOVELY_APK_URL = "https://lmm.shorty.systems/base.apk"
 
+# Build-time Java/Dex toolchain for the Android ZIP MOD importer.
+MODSYNC_ANDROID_JAR_URL = "https://repo.maven.apache.org/maven2/com/google/android/android/4.1.1.4/android-4.1.1.4.jar"
+MODSYNC_R8_URL = "https://storage.googleapis.com/r8-releases/raw/8.3.37/r8.jar"
+
 # ReVanced's prebuilt native aapt2 binaries. The apktool jar only ships an
 # x86-64 aapt2, which cannot run on ARM Android, so when building on Termux we
 # point apktool at one of these via --use-aapt2. https://github.com/ReVanced/aapt2
@@ -1231,6 +1235,85 @@ def _patch_sdl_portrait_orientation(apk_out):
     with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(smali)
 
+
+def _patch_sdl_modsync(apk_out):
+    """Run the external MOD importer whenever SDLActivity resumes."""
+    smali_path = os.path.join(apk_out, "smali", "org", "libsdl", "app", "SDLActivity.smali")
+    with open(smali_path, "r", encoding="utf-8") as f:
+        smali = f.read()
+    signature = ".method protected onResume()V"
+    start = smali.find(signature)
+    if start < 0:
+        raise RuntimeError("SDLActivity.onResume() not found for MOD importer hook")
+    end = smali.find(".end method", start)
+    body = smali[start:end]
+    invoke = "    invoke-static {p0}, Lorg/balatro/modsync/ModSync;->onResume(Landroid/app/Activity;)V"
+    if invoke not in body:
+        anchor = "    invoke-super {p0}, Landroid/app/Activity;->onResume()V"
+        pos = body.find(anchor)
+        if pos < 0:
+            raise RuntimeError("SDLActivity.onResume() super call not found")
+        pos += len(anchor)
+        body = body[:pos] + "\n\n" + invoke + body[pos:]
+        smali = smali[:start] + body + smali[end:]
+    with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(smali)
+
+
+def _build_modsync_dex(apk_out):
+    """Compile the small Android helper and return its dex path and APK entry."""
+    source = os.path.join("android-modsync", "src", "org", "balatro", "modsync", "ModSync.java")
+    if not os.path.isfile(source):
+        raise FileNotFoundError("Android MOD importer source is missing: " + source)
+
+    android_jar = os.path.join(WORKDIR, "modsync-android.jar")
+    r8_jar = os.path.join(WORKDIR, "modsync-r8.jar")
+    _download(MODSYNC_ANDROID_JAR_URL, android_jar)
+    _download(MODSYNC_R8_URL, r8_jar)
+
+    javac_name = "javac.exe" if os.name == "nt" else "javac"
+    javac = os.path.join(os.path.dirname(JAVA_BIN), javac_name)
+    if not os.path.isfile(javac):
+        raise FileNotFoundError("javac not found beside the configured JDK: " + javac)
+
+    classes_dir = os.path.join(WORKDIR, "modsync-classes")
+    dex_dir = os.path.join(WORKDIR, "modsync-dex")
+    for path in (classes_dir, dex_dir):
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.makedirs(path)
+
+    _run_checked([
+        javac, "-source", "8", "-target", "8",
+        "-classpath", android_jar, "-d", classes_dir, source,
+    ], os.getcwd(), "Android MOD importer Java compilation")
+
+    class_jar = os.path.join(WORKDIR, "modsync-classes.jar")
+    with zipfile.ZipFile(class_jar, "w", zipfile.ZIP_DEFLATED) as archive:
+        for root, _, files in os.walk(classes_dir):
+            for filename in files:
+                if filename.endswith(".class"):
+                    full = os.path.join(root, filename)
+                    archive.write(full, os.path.relpath(full, classes_dir).replace(os.sep, "/"))
+
+    _run_checked([
+        JAVA_BIN, "-cp", r8_jar, "com.android.tools.r8.D8",
+        "--min-api", "21", "--lib", android_jar,
+        "--output", dex_dir, class_jar,
+    ], os.getcwd(), "Android MOD importer DEX compilation")
+
+    dex_path = os.path.join(dex_dir, "classes.dex")
+    if not os.path.isfile(dex_path):
+        raise RuntimeError("D8 completed without producing classes.dex")
+
+    highest = 1
+    for name in os.listdir(apk_out):
+        match = re.fullmatch(r"smali_classes(\d+)", name)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return dex_path, "classes" + str(highest + 1) + ".dex"
+
+
 def build_apk(profiler=None):
     """Download tools, package, and sign the always-Lovely Android APK."""
     game_love_src = os.path.abspath("Game.love")
@@ -1280,6 +1363,9 @@ def build_apk(profiler=None):
         with open(manifest_path) as f:
             m = f.read()
         m = m.replace("systems.shorty.lmm", "com.unofficial.balatro")
+        if "android.permission.MANAGE_EXTERNAL_STORAGE" not in m:
+            permission = '    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n'
+            m = re.sub(r"(<application\b)", lambda match: permission + match.group(1), m, count=1)
         m = re.sub(r'android:label="[^"]+"',         'android:label="Balatro"',          m)
         m = re.sub(r'android:versionCode="[^"]+"',   f'android:versionCode="{int(time.time())}"', m)
         m = re.sub(r'android:versionName="[^"]+"',   f'android:versionName="{MOD_VERSION}-lovely"', m)
@@ -1297,6 +1383,8 @@ def build_apk(profiler=None):
 
         _patch_sdl_portrait_orientation(apk_out)
         print("  [Lovely] SDL orientation patched.")
+        _patch_sdl_modsync(apk_out)
+        print("  [MOD] SDL resume hook installed.")
 
         # Icons
         for density in ["hdpi","mdpi","xhdpi","xxhdpi","xxxhdpi"]:
@@ -1311,9 +1399,17 @@ def build_apk(profiler=None):
         os.makedirs(os.path.dirname(game_dst), exist_ok=True)
         shutil.copy(game_love_src, game_dst)
 
+    with p.step("Compile MOD importer"):
+        modsync_dex, modsync_entry = _build_modsync_dex(apk_out)
+
     with p.step("Repack APK"):
         print("  Repacking APK ...")
         _apktool(apktool, ["b", "-o", "balatro.apk", "balatro-apk"])
+        with zipfile.ZipFile("balatro.apk", "a", zipfile.ZIP_DEFLATED) as apk_zip:
+            if modsync_entry in apk_zip.namelist():
+                raise RuntimeError("MOD importer DEX entry already exists: " + modsync_entry)
+            apk_zip.write(modsync_dex, modsync_entry)
+        print("  [MOD] Importer DEX added as " + modsync_entry)
 
     with p.step("Sign APK"):
         print("  Signing APK ...")
