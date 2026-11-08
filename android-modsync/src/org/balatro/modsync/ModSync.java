@@ -84,8 +84,8 @@ public final class ModSync {
                             String count = result.substring("UPDATED:".length());
                             new AlertDialog.Builder(activity)
                                 .setTitle("MOD 已同步")
-                                .setMessage("已从指定目录导入 " + count
-                                    + " 个 MOD 压缩包。需要重启游戏一次，MOD 才会被加载。")
+                                .setMessage("已完成 " + count
+                                    + " 项 MOD 新增、更新、修复或卸载操作。需要重启游戏一次，MOD 才会被加载。")
                                 .setCancelable(false)
                                 .setPositiveButton("立即重启", new DialogInterface.OnClickListener() {
                                     @Override public void onClick(DialogInterface dialog, int which) {
@@ -377,7 +377,9 @@ public final class ModSync {
                         || name.indexOf((char) 0) >= 0) {
                     throw new Exception("ZIP 含有不安全路径：" + name);
                 }
-                String[] parts = name.split("/");
+                String normalized = name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
+                if (normalized.length() == 0) throw new Exception("ZIP 路径无效：" + name);
+                String[] parts = normalized.split("/");
                 if (parts.length == 0 || !isSafeModDirectoryName(parts[0])) {
                     throw new Exception("ZIP 顶层目录无效：" + name);
                 }
@@ -390,8 +392,8 @@ public final class ModSync {
                 if (!root.equals(parts[0])) {
                     throw new Exception("一个 ZIP 中必须只有一个顶层 MOD 文件夹。");
                 }
-                if (!seen.add(name)) throw new Exception("ZIP 中存在重复路径：" + name);
-                File out = new File(staging, name);
+                if (!seen.add(normalized)) throw new Exception("ZIP 中存在重复路径：" + name);
+                File out = new File(staging, normalized);
                 String base = staging.getCanonicalPath() + File.separator;
                 if (!out.getCanonicalPath().startsWith(base)) {
                     throw new Exception("ZIP 路径越界：" + name);
