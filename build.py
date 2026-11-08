@@ -1237,7 +1237,7 @@ def _patch_sdl_portrait_orientation(apk_out):
 
 
 def _patch_sdl_modsync(apk_out):
-    """Run the external MOD importer whenever SDLActivity resumes."""
+    """Install a small in-APK bridge that loads the ZIP importer from assets."""
     smali_path = os.path.join(apk_out, "smali", "org", "libsdl", "app", "SDLActivity.smali")
     with open(smali_path, "r", encoding="utf-8") as f:
         smali = f.read()
@@ -1247,7 +1247,7 @@ def _patch_sdl_modsync(apk_out):
         raise RuntimeError("SDLActivity.onResume() not found for MOD importer hook")
     end = smali.find(".end method", start)
     body = smali[start:end]
-    invoke = "    invoke-static {p0}, Lorg/balatro/modsync/ModSync;->onResume(Landroid/app/Activity;)V"
+    invoke = "    invoke-static {p0}, Lorg/balatro/modsync/ModSyncBridge;->onResume(Landroid/app/Activity;)V"
     if invoke not in body:
         anchor = "    invoke-super {p0}, Landroid/app/Activity;->onResume()V"
         pos = body.find(anchor)
@@ -1259,9 +1259,99 @@ def _patch_sdl_modsync(apk_out):
     with open(smali_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(smali)
 
+    bridge_path = os.path.join(apk_out, "smali", "org", "balatro", "modsync", "ModSyncBridge.smali")
+    os.makedirs(os.path.dirname(bridge_path), exist_ok=True)
+    bridge = r""".class public Lorg/balatro/modsync/ModSyncBridge;
+.super Ljava/lang/Object;
+
+.field private static syncMethod:Ljava/lang/reflect/Method;
+
+.method public static onResume(Landroid/app/Activity;)V
+    .locals 8
+    :try_start_0
+    sget-object v0, Lorg/balatro/modsync/ModSyncBridge;->syncMethod:Ljava/lang/reflect/Method;
+    if-nez v0, :invoke_sync
+
+    invoke-virtual {p0}, Landroid/app/Activity;->getAssets()Landroid/content/res/AssetManager;
+    move-result-object v0
+    const-string v1, "modsync.dex"
+    invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->open(Ljava/lang/String;)Ljava/io/InputStream;
+    move-result-object v0
+
+    invoke-virtual {p0}, Landroid/app/Activity;->getCodeCacheDir()Ljava/io/File;
+    move-result-object v2
+    const-string v3, "balatro-modsync.dex"
+    new-instance v1, Ljava/io/File;
+    invoke-direct {v1, v2, v3}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+    new-instance v2, Ljava/io/FileOutputStream;
+    invoke-direct {v2, v1}, Ljava/io/FileOutputStream;-><init>(Ljava/io/File;)V
+
+    const/16 v3, 0x4000
+    new-array v3, v3, [B
+    :copy_dex_loop
+    invoke-virtual {v0, v3}, Ljava/io/InputStream;->read([B)I
+    move-result v4
+    if-lez v4, :copy_dex_done
+    const/4 v5, 0x0
+    invoke-virtual {v2, v3, v5, v4}, Ljava/io/OutputStream;->write([BII)V
+    goto :copy_dex_loop
+
+    :copy_dex_done
+    invoke-virtual {v0}, Ljava/io/InputStream;->close()V
+    invoke-virtual {v2}, Ljava/io/FileOutputStream;->close()V
+
+    invoke-virtual {p0}, Landroid/app/Activity;->getCodeCacheDir()Ljava/io/File;
+    move-result-object v2
+    invoke-virtual {v2}, Ljava/io/File;->getAbsolutePath()Ljava/lang/String;
+    move-result-object v2
+    invoke-virtual {v1}, Ljava/io/File;->getAbsolutePath()Ljava/lang/String;
+    move-result-object v5
+    invoke-virtual {p0}, Landroid/app/Activity;->getClassLoader()Ljava/lang/ClassLoader;
+    move-result-object v3
+    new-instance v4, Ldalvik/system/DexClassLoader;
+    const/4 v6, 0x0
+    invoke-direct {v4, v5, v2, v6, v3}, Ldalvik/system/DexClassLoader;-><init>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/ClassLoader;)V
+    const-string v5, "org.balatro.modsync.ModSync"
+    invoke-virtual {v4, v5}, Ljava/lang/ClassLoader;->loadClass(Ljava/lang/String;)Ljava/lang/Class;
+    move-result-object v4
+
+    const/4 v5, 0x1
+    new-array v5, v5, [Ljava/lang/Class;
+    const-class v6, Landroid/app/Activity;
+    const/4 v7, 0x0
+    aput-object v6, v5, v7
+    const-string v6, "onResume"
+    invoke-virtual {v4, v6, v5}, Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
+    move-result-object v4
+    sput-object v4, Lorg/balatro/modsync/ModSyncBridge;->syncMethod:Ljava/lang/reflect/Method;
+
+    :invoke_sync
+    sget-object v0, Lorg/balatro/modsync/ModSyncBridge;->syncMethod:Ljava/lang/reflect/Method;
+    const/4 v1, 0x1
+    new-array v1, v1, [Ljava/lang/Object;
+    const/4 v2, 0x0
+    aput-object p0, v1, v2
+    const/4 v2, 0x0
+    invoke-virtual {v0, v2, v1}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+    move-result-object v3
+    :try_end_0
+    return-void
+
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
+    :catch_0
+    move-exception v0
+    const-string v1, "BalatroModSync"
+    const-string v2, "Failed to load or run MOD importer"
+    invoke-static {v1, v2, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+    return-void
+.end method
+"""
+    with open(bridge_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(bridge)
+
 
 def _build_modsync_dex(apk_out):
-    """Compile the small Android helper and return its dex path and APK entry."""
+    """Compile the importer DEX and package it as an asset for the bridge."""
     source = os.path.join("android-modsync", "src", "org", "balatro", "modsync", "ModSync.java")
     if not os.path.isfile(source):
         raise FileNotFoundError("Android MOD importer source is missing: " + source)
@@ -1305,13 +1395,10 @@ def _build_modsync_dex(apk_out):
     dex_path = os.path.join(dex_dir, "classes.dex")
     if not os.path.isfile(dex_path):
         raise RuntimeError("D8 completed without producing classes.dex")
-
-    highest = 1
-    for name in os.listdir(apk_out):
-        match = re.fullmatch(r"smali_classes(\d+)", name)
-        if match:
-            highest = max(highest, int(match.group(1)))
-    return dex_path, "classes" + str(highest + 1) + ".dex"
+    assets_dir = os.path.join(apk_out, "assets")
+    os.makedirs(assets_dir, exist_ok=True)
+    shutil.copy2(dex_path, os.path.join(assets_dir, "modsync.dex"))
+    return os.path.join(assets_dir, "modsync.dex")
 
 
 def build_apk(profiler=None):
@@ -1400,28 +1487,21 @@ def build_apk(profiler=None):
         shutil.copy(game_love_src, game_dst)
 
     with p.step("Compile MOD importer"):
-        modsync_dex, modsync_entry = _build_modsync_dex(apk_out)
+        modsync_asset = _build_modsync_dex(apk_out)
+        print("  [MOD] Importer DEX packaged as assets/modsync.dex")
 
     with p.step("Repack APK"):
         print("  Repacking APK ...")
         _apktool(apktool, ["b", "-o", "balatro.apk", "balatro-apk"])
-        with zipfile.ZipFile("balatro.apk", "a", zipfile.ZIP_DEFLATED) as apk_zip:
-            if modsync_entry in apk_zip.namelist():
-                raise RuntimeError("MOD importer DEX entry already exists: " + modsync_entry)
-            apk_zip.write(modsync_dex, modsync_entry)
-        print("  [MOD] Importer DEX added as " + modsync_entry)
 
     with p.step("Sign APK"):
         print("  Signing APK ...")
         _sign_apk(signer)
         signed_apk = os.path.join(WORKDIR, "balatro-aligned-debugSigned.apk")
         with zipfile.ZipFile(signed_apk, "r") as signed_zip:
-            signed_entries = signed_zip.namelist()
-            if modsync_entry not in signed_entries:
-                raise RuntimeError(
-                    "APK signer dropped the MOD importer DEX: " + modsync_entry
-                )
-        print("  [MOD] Verified importer DEX survived APK signing.")
+            if "assets/modsync.dex" not in signed_zip.namelist():
+                raise RuntimeError("APK signer dropped assets/modsync.dex")
+        print("  [MOD] Verified importer DEX asset survived APK signing.")
 
     p.report()
     print(f"\n{'=' * 60}")
