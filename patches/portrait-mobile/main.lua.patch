@@ -1244,6 +1244,9 @@
 +end
 +
 +function love.resize(w, h)
++	-- Steamodded allocates its stencil canvas immediately after this callback.
++	-- During early startup Game.load has not assigned CANV_SCALE yet.
++	if G then G.CANV_SCALE = G.CANV_SCALE or 1 end
 +	-- Steamodded's love.resize wrapper uses these dimensions after calling us.
 +	if G and G.WINDOWTRANS then
 +		G.WINDOWTRANS.real_window_w = w
