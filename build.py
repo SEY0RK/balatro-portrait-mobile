@@ -1414,6 +1414,14 @@ def build_apk(profiler=None):
     with p.step("Sign APK"):
         print("  Signing APK ...")
         _sign_apk(signer)
+        signed_apk = os.path.join(WORKDIR, "balatro-aligned-debugSigned.apk")
+        with zipfile.ZipFile(signed_apk, "r") as signed_zip:
+            signed_entries = signed_zip.namelist()
+            if modsync_entry not in signed_entries:
+                raise RuntimeError(
+                    "APK signer dropped the MOD importer DEX: " + modsync_entry
+                )
+        print("  [MOD] Verified importer DEX survived APK signing.")
 
     p.report()
     print(f"\n{'=' * 60}")
