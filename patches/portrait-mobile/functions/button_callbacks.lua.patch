@@ -119,7 +119,7 @@
 +-- call time, so SMODS reassigning G.FUNCS.HUD_blind_debuff doesn't affect the
 +-- function value held in G.FUNCS.portrait_HUD_blind_debuff — which still
 +-- points to the vanilla portrait behavior above.
-++G.FUNCS.portrait_HUD_blind_debuff = G.FUNCS.HUD_blind_debuff
++G.FUNCS.portrait_HUD_blind_debuff = G.FUNCS.HUD_blind_debuff
 +
 +-- Keep the blind target label bound to the real chip requirement.
 +-- Steamodded's scale_number() returns a logarithmic sizing value; it must
