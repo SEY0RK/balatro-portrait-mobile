@@ -1009,6 +1009,13 @@
 -function love.resize(w, h)
 +_portrait_apply_resize = function(w, h)
 +	if not G then return end
++	-- Steamodded wraps love.resize and allocates its stencil canvas immediately
++	-- after this callback, even while the first Android room is not ready.
++	-- Publish physical dimensions before the deferred-room early return.
++	if G.WINDOWTRANS then
++		G.WINDOWTRANS.real_window_w = w
++		G.WINDOWTRANS.real_window_h = h
++	end
 +	if not G.ROOM then G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}; return end
 -	if w/h < 1 then --Dont allow the screen to be too square, since pop in occurs above and below screen
 -		h = w/1
@@ -1237,6 +1244,11 @@
 +end
 +
 +function love.resize(w, h)
++	-- Steamodded's love.resize wrapper uses these dimensions after calling us.
++	if G and G.WINDOWTRANS then
++		G.WINDOWTRANS.real_window_w = w
++		G.WINDOWTRANS.real_window_h = h
++	end
 +	if love.system.getOS() == 'Android' and G and G.ROOM then
 +		local pending = G.PORTRAIT_RESIZE_PENDING
 +		if not pending or pending.w ~= w or pending.h ~= h then
