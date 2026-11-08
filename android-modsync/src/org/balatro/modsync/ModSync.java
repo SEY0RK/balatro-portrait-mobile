@@ -322,7 +322,7 @@ public final class ModSync {
     private static boolean isSafeModDirectoryName(String name) {
         return name != null && name.length() > 0 && !".".equals(name) && !"..".equals(name)
             && name.indexOf('/') < 0 && name.indexOf('\\') < 0
-            && name.indexOf(':') < 0 && name.indexOf('\\0') < 0;
+            && name.indexOf(':') < 0 && name.indexOf((char) 0) < 0;
     }
 
     private static String treeSha256(File root) throws Exception {
@@ -374,7 +374,7 @@ public final class ModSync {
             while ((entry = in.getNextEntry()) != null) {
                 String name = entry.getName().replace('\\', '/');
                 if (name.length() == 0 || name.startsWith("/") || name.indexOf(':') >= 0
-                        || name.indexOf('\\0') >= 0) {
+                        || name.indexOf((char) 0) >= 0) {
                     throw new Exception("ZIP 含有不安全路径：" + name);
                 }
                 String[] parts = name.split("/");
