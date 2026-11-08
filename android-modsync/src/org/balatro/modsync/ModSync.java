@@ -321,7 +321,7 @@ public final class ModSync {
 
     private static boolean isSafeModDirectoryName(String name) {
         return name != null && name.length() > 0 && !".".equals(name) && !"..".equals(name)
-            && name.indexOf('/') < 0 && name.indexOf('\\\\') < 0
+            && name.indexOf('/') < 0 && name.indexOf('\\') < 0
             && name.indexOf(':') < 0 && name.indexOf('\\0') < 0;
     }
 
@@ -372,7 +372,7 @@ public final class ModSync {
         try {
             ZipEntry entry;
             while ((entry = in.getNextEntry()) != null) {
-                String name = entry.getName().replace('\\\\', '/');
+                String name = entry.getName().replace('\\', '/');
                 if (name.length() == 0 || name.startsWith("/") || name.indexOf(':') >= 0
                         || name.indexOf('\\0') >= 0) {
                     throw new Exception("ZIP 含有不安全路径：" + name);
