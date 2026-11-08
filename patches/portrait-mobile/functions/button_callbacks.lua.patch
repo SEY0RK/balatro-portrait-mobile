@@ -119,20 +119,20 @@
 +-- call time, so SMODS reassigning G.FUNCS.HUD_blind_debuff doesn't affect the
 +-- function value held in G.FUNCS.portrait_HUD_blind_debuff — which still
 +-- points to the vanilla portrait behavior above.
-+G.FUNCS.portrait_HUD_blind_debuff = G.FUNCS.HUD_blind_debuff
+++G.FUNCS.portrait_HUD_blind_debuff = G.FUNCS.HUD_blind_debuff
 +
 +-- Keep the blind target label bound to the real chip requirement.
--- Steamodded's scale_number() returns a logarithmic sizing value; it must
--- never become the displayed target score. Preserve its sizing callback,
--- then explicitly restore chip_text from Blind.chips using number_format().
-G.FUNCS.portrait_blind_chip_UI_scale = function(e)
-  if G.FUNCS.blind_chip_UI_scale then
-    G.FUNCS.blind_chip_UI_scale(e)
-  end
-  local blind = G.GAME and G.GAME.blind
-  if not blind or type(blind.chips) ~= 'number' then return end
-  blind.chip_text = number_format(blind.chips)
-end
++-- Steamodded's scale_number() returns a logarithmic sizing value; it must
++-- never become the displayed target score. Preserve its sizing callback,
++-- then explicitly restore chip_text from Blind.chips using number_format().
++G.FUNCS.portrait_blind_chip_UI_scale = function(e)
++  if G.FUNCS.blind_chip_UI_scale then
++    G.FUNCS.blind_chip_UI_scale(e)
++  end
++  local blind = G.GAME and G.GAME.blind
++  if not blind or type(blind.chips) ~= 'number' then return end
++  blind.chip_text = number_format(blind.chips)
++end
 +
  --Adds the prefix for the debuff text for the wheel blind
  --
