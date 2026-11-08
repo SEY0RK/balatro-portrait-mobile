@@ -1283,6 +1283,23 @@ def _patch_sdl_modsync(apk_out):
     const-string v3, "balatro-modsync.dex"
     new-instance v1, Ljava/io/File;
     invoke-direct {v1, v2, v3}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+    # Remove any cached copy first. The previous build may have left a read-only DEX,
+    # and FileOutputStream must create a fresh writable file before we seal it below.
+    invoke-virtual {v1}, Ljava/io/File;->exists()Z
+    move-result v2
+    if-eqz v2, :create_dex_file
+    invoke-virtual {v1}, Ljava/io/File;->delete()Z
+    move-result v2
+    if-eqz v2, :delete_dex_failed
+    goto :create_dex_file
+
+    :delete_dex_failed
+    new-instance v0, Ljava/io/IOException;
+    const-string v2, "Unable to replace cached MOD importer DEX"
+    invoke-direct {v0, v2}, Ljava/io/IOException;-><init>(Ljava/lang/String;)V
+    throw v0
+
+    :create_dex_file
     new-instance v2, Ljava/io/FileOutputStream;
     invoke-direct {v2, v1}, Ljava/io/FileOutputStream;-><init>(Ljava/io/File;)V
 
@@ -1300,6 +1317,23 @@ def _patch_sdl_modsync(apk_out):
     invoke-virtual {v0}, Ljava/io/InputStream;->close()V
     invoke-virtual {v2}, Ljava/io/FileOutputStream;->close()V
 
+    # Android 14+ rejects DEX files loaded from writable locations.
+    # Seal the completed file before passing it to DexClassLoader.
+    invoke-virtual {v1}, Ljava/io/File;->setReadOnly()Z
+    move-result v2
+    if-eqz v2, :dex_readonly_failed
+    invoke-virtual {v1}, Ljava/io/File;->canWrite()Z
+    move-result v2
+    if-nez v2, :dex_readonly_failed
+    goto :dex_readonly_ready
+
+    :dex_readonly_failed
+    new-instance v0, Ljava/lang/SecurityException;
+    const-string v2, "MOD importer DEX could not be made read-only"
+    invoke-direct {v0, v2}, Ljava/lang/SecurityException;-><init>(Ljava/lang/String;)V
+    throw v0
+
+    :dex_readonly_ready
     invoke-virtual {p0}, Landroid/app/Activity;->getCodeCacheDir()Ljava/io/File;
     move-result-object v2
     invoke-virtual {v2}, Ljava/io/File;->getAbsolutePath()Ljava/lang/String;
