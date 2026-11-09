@@ -131,7 +131,7 @@
 +  end
 +  local blind = G.GAME and G.GAME.blind
 +  if not blind or type(blind.chips) ~= 'number' then return end
-+  blind.chip_text = number_format(blind.chips)
++  blind.chip_text = _lformat(blind.chips)
 +end
 +
  --Adds the prefix for the debuff text for the wheel blind
