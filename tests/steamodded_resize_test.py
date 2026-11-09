@@ -26,15 +26,30 @@ resize_body = mobile[resize_start:]
 
 require_before(
     resize_body,
-    "+\tif G then G.CANV_SCALE = G.CANV_SCALE or 1 end",
+    "+\t\tG.CANV_SCALE = G.CANV_SCALE or 1",
     "+\tif love.system.getOS() == 'Android' and G and G.ROOM then",
     "CANV_SCALE must be initialized before Android resize deferral",
 )
 require_before(
     resize_body,
+    "+\t\tif not G.WINDOWTRANS then G.WINDOWTRANS = {} end",
     "+\tif love.system.getOS() == 'Android' and G and G.ROOM then",
-    "+\tif G and G.WINDOWTRANS then",
-    "Android resize must defer publishing new dimensions until the stable resize",
+    "WINDOWTRANS must be republished before the Android deferral returns",
+)
+require(
+    mobile,
+    "+\t\t\tG.WINDOWTRANS.real_window_w = G.CANVAS:getWidth() / scale",
+    "stencil dimensions must come from the live game canvas, not from w/h",
+)
+require(
+    mobile,
+    "+\t\t\tG.WINDOWTRANS.real_window_w = w",
+    "a cold start without a main canvas must still publish a placeholder",
+)
+require(
+    mobile,
+    "+\t\telseif G.WINDOWTRANS.real_window_w == nil then",
+    "an existing published size must survive a frame with no main canvas",
 )
 require(
     mobile,
