@@ -523,6 +523,19 @@
 +    G:update(dt)
  end
  
++local function portrait_sync_smods_stencil_canvas()
++    if not (SMODS and G and G.CANVAS) then return end
++    -- Rebuild from the actual game canvas dimensions, not an independently
++    -- sampled window size. This makes the color and stencil attachments atomic.
++    local replacement = love.graphics.newCanvas(
++        G.CANVAS:getWidth(), G.CANVAS:getHeight(),
++        {format = "stencil8", readable = false}
++    )
++    local previous = SMODS.stencil_canvas
++    SMODS.stencil_canvas = replacement
++    if previous and previous.release then previous:release() end
++end
++
 +local _portrait_apply_resize
  function love.draw()
 +    local os_name = love.system.getOS()
@@ -542,6 +555,7 @@
 +        if pending.stable_frames >= 2 and screen_w > 0 and screen_h > 0 and G.window_prev then
 +            G.PORTRAIT_RESIZE_PENDING = nil
 +            _portrait_apply_resize(screen_w, screen_h)
++            portrait_sync_smods_stencil_canvas()
 +        end
 +        if not G.CANVAS then
 +            love.graphics.origin()
@@ -596,6 +610,7 @@
 +            if pending.stable_frames >= 2 and not waiting_for_requested_orientation and G.ROOM then
 +                G.PORTRAIT_RESIZE_PENDING = nil
 +                _portrait_apply_resize(screen_w, screen_h)
++                portrait_sync_smods_stencil_canvas()
 +            else
 +                -- Keep the last complete framebuffer scaled to the new surface
 +                -- while Android finishes its fold/unfold configuration change.
@@ -1248,16 +1263,19 @@
 +	-- During early startup Game.load has not assigned CANV_SCALE yet.
 +	if G then G.CANV_SCALE = G.CANV_SCALE or 1 end
 +	-- Steamodded's love.resize wrapper uses these dimensions after calling us.
-+	if G and G.WINDOWTRANS then
-+		G.WINDOWTRANS.real_window_w = w
-+		G.WINDOWTRANS.real_window_h = h
-+	end
++	-- Defer publishing the new physical size while Android is still settling.
++	-- Steamodded wraps this callback and immediately sizes its stencil canvas from
++	-- WINDOWTRANS; publishing early would pair a new stencil with the old G.CANVAS.
 +	if love.system.getOS() == 'Android' and G and G.ROOM then
 +		local pending = G.PORTRAIT_RESIZE_PENDING
 +		if not pending or pending.w ~= w or pending.h ~= h then
 +			G.PORTRAIT_RESIZE_PENDING = {w = w, h = h, stable_frames = 0}
 +		end
 +		return
++	end
++	if G and G.WINDOWTRANS then
++		G.WINDOWTRANS.real_window_w = w
++		G.WINDOWTRANS.real_window_h = h
 +	end
 +	_portrait_apply_resize(w, h)
 +end
