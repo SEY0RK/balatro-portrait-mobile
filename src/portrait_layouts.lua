@@ -343,7 +343,7 @@ local function blind_target(w)
     {n=G.UIT.R, config={align = "cm", minh = 0.6}, nodes={
       stake_icon(0.45),
       hgap(0.08),
-      {n=G.UIT.T, config={ref_table = G.GAME.blind, ref_value = 'chip_text', scale = 0.001, colour = G.C.RED, shadow = true, id = 'HUD_blind_count', func = 'blind_chip_UI_scale'}},
+      {n=G.UIT.T, config={ref_table = G.GAME.blind, ref_value = 'chip_text', scale = 0.001, colour = G.C.RED, shadow = true, id = 'HUD_blind_count', func = 'portrait_blind_chip_UI_scale'}},
     }},
     {n=G.UIT.R, config={align = "cm", minh = 0.45, maxw = w, func = 'HUD_blind_reward'}, nodes={
       {n=G.UIT.T, config={text = localize('ph_blind_reward'), scale = L, colour = light()}},
@@ -974,7 +974,7 @@ function portrait_rebuild_HUD()
     blind_chips = G.HUD_blind:get_UIE_by_ID('HUD_blind_count'),
     blind_spacer = G.HUD:get_UIE_by_ID('blind_spacer'),
   }
-  G.FUNCS.blind_chip_UI_scale(G.hand_text_area.blind_chips)
+  G.FUNCS.portrait_blind_chip_UI_scale(G.hand_text_area.blind_chips)
   G.HUD:recalculate()
   if is_portrait then portrait_position_run_hud(G.HUD) end
   G.HUD_blind:recalculate()
